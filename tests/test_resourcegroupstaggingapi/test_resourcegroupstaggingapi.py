@@ -2,7 +2,11 @@ from __future__ import unicode_literals
 
 import boto3
 import sure  # noqa
-from moto import mock_resourcegroupstaggingapi, mock_s3, mock_ec2, mock_elbv2
+from moto import mock_ec2
+from moto import mock_elbv2
+from moto import mock_kms
+from moto import mock_resourcegroupstaggingapi
+from moto import mock_s3
 
 
 @mock_s3
@@ -223,12 +227,15 @@ def test_get_tag_values_ec2():
     resp['TagValues'].should.contain('MY_VALUE1')
     resp['TagValues'].should.contain('MY_VALUE4')
 
+
 @mock_ec2
 @mock_elbv2
+@mock_kms
 @mock_resourcegroupstaggingapi
-def test_get_resources_elbv2():
-    conn = boto3.client('elbv2', region_name='us-east-1')
+def test_get_many_resources():
+    elbv2 = boto3.client('elbv2', region_name='us-east-1')
     ec2 = boto3.resource('ec2', region_name='us-east-1')
+    kms = boto3.client('kms', region_name='us-east-1')
 
     security_group = ec2.create_security_group(
         GroupName='a-security-group', Description='First One')
@@ -242,29 +249,43 @@ def test_get_resources_elbv2():
         CidrBlock='172.28.7.0/26',
         AvailabilityZone='us-east-1b')
 
-    conn.create_load_balancer(
+    elbv2.create_load_balancer(
         Name='my-lb',
         Subnets=[subnet1.id, subnet2.id],
         SecurityGroups=[security_group.id],
         Scheme='internal',
         Tags=[
             {
-                'Key': 'key_name', 
+                'Key': 'key_name',
                 'Value': 'a_value'
             },
             {
                 'Key': 'key_2',
                 'Value': 'val2'
             }
-            ]
-        )
+        ]
+    )
 
-    conn.create_load_balancer(
+    elbv2.create_load_balancer(
         Name='my-other-lb',
         Subnets=[subnet1.id, subnet2.id],
         SecurityGroups=[security_group.id],
         Scheme='internal',
-        )
+    )
+
+    kms.create_key(
+        KeyUsage='ENCRYPT_DECRYPT',
+        Tags=[
+            {
+                'TagKey': 'key_name',
+                'TagValue': 'a_value'
+            },
+            {
+                'TagKey': 'key_2',
+                'TagValue': 'val2'
+            }
+        ]
+    )
 
     rtapi = boto3.client('resourcegroupstaggingapi', region_name='us-east-1')
 
@@ -274,10 +295,8 @@ def test_get_resources_elbv2():
     resp['ResourceTagMappingList'][0]['ResourceARN'].should.contain('loadbalancer/')
     resp = rtapi.get_resources(
         ResourceTypeFilters=['elasticloadbalancer:loadbalancer'],
-        TagFilters=[{
-                'Key': 'key_name'
-            }]
-        )
+        TagFilters=[{'Key': 'key_name'}]
+    )
 
     resp['ResourceTagMappingList'].should.have.length_of(1)
     resp['ResourceTagMappingList'][0]['Tags'].should.contain({'Key': 'key_name', 'Value': 'a_value'})
