@@ -36,7 +36,6 @@ from moto import (
     mock_logs,
     mock_rds_deprecated,
     mock_rds2,
-    mock_rds2_deprecated,
     mock_redshift,
     mock_redshift_deprecated,
     mock_route53_deprecated,
