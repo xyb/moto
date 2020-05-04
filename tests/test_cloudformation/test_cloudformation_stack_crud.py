@@ -9,6 +9,8 @@ import boto.s3
 import boto.s3.key
 import boto.cloudformation
 from boto.exception import BotoServerError
+import boto3
+from botocore.exceptions import ClientError
 import sure  # noqa
 
 # Ensure 'assert_raises' context manager support for Python 2.6
@@ -17,7 +19,10 @@ from nose.tools import assert_raises
 from moto.core import ACCOUNT_ID
 
 from moto import (
-    mock_cloudformation_deprecated,
+    mock_cloudformation,
+    mock_s3,
+    mock_route53,
+    mock_iam,
     mock_s3_deprecated,
     mock_route53_deprecated,
     mock_iam_deprecated,
@@ -50,31 +55,10 @@ dummy_template_json2 = json.dumps(dummy_template2)
 dummy_template_json3 = json.dumps(dummy_template3)
 
 
-@mock_cloudformation_deprecated
-def test_create_stack():
-    conn = boto.connect_cloudformation()
-    conn.create_stack("test_stack", template_body=dummy_template_json)
-
-    stack = conn.describe_stacks()[0]
-    stack.stack_name.should.equal("test_stack")
-    stack.get_template().should.equal(
-        {
-            "GetTemplateResponse": {
-                "GetTemplateResult": {
-                    "TemplateBody": dummy_template_json,
-                    "ResponseMetadata": {
-                        "RequestId": "2d06e36c-ac1d-11e0-a958-f9382b6eb86bEXAMPLE"
-                    },
-                }
-            }
-        }
-    )
-
-
-@mock_cloudformation_deprecated
-@mock_route53_deprecated
+@mock_cloudformation
+@mock_route53
 def test_create_stack_hosted_zone_by_id():
-    conn = boto.connect_cloudformation()
+    conn = boto3.client("cloudformation", region_name="us-east-1")
     dummy_template = {
         "AWSTemplateFormatVersion": "2010-09-09",
         "Description": "Stack 1",
@@ -98,211 +82,56 @@ def test_create_stack_hosted_zone_by_id():
         },
     }
     conn.create_stack(
-        "test_stack", template_body=json.dumps(dummy_template), parameters={}.items()
+        StackName="test_stack", TemplateBody=json.dumps(dummy_template), Parameters=[],
     )
-    r53_conn = boto.connect_route53()
-    zone_id = r53_conn.get_zones()[0].id
+    r53_conn = boto3.client("route53", region_name="us-east-1")
+    zone_id = r53_conn.list_hosted_zones()["HostedZones"][0]["Id"]
     conn.create_stack(
-        "test_stack",
-        template_body=json.dumps(dummy_template2),
-        parameters={"ZoneId": zone_id}.items(),
+        StackName="test_stack",
+        TemplateBody=json.dumps(dummy_template2),
+        Parameters=[{"ParameterKey": "ZoneId", "ParameterValue": zone_id}],
     )
 
-    stack = conn.describe_stacks()[0]
-    assert stack.list_resources()
+    stack = conn.describe_stacks()["Stacks"][0]
+    assert conn.describe_stack_resources(StackName="test_stack")
 
 
-@mock_cloudformation_deprecated
-def test_creating_stacks_across_regions():
-    west1_conn = boto.cloudformation.connect_to_region("us-west-1")
-    west1_conn.create_stack("test_stack", template_body=dummy_template_json)
-
-    west2_conn = boto.cloudformation.connect_to_region("us-west-2")
-    west2_conn.create_stack("test_stack", template_body=dummy_template_json)
-
-    list(west1_conn.describe_stacks()).should.have.length_of(1)
-    list(west2_conn.describe_stacks()).should.have.length_of(1)
-
-
-@mock_cloudformation_deprecated
-def test_create_stack_with_notification_arn():
-    conn = boto.connect_cloudformation()
-    conn.create_stack(
-        "test_stack_with_notifications",
-        template_body=dummy_template_json,
-        notification_arns="arn:aws:sns:us-east-1:{}:fake-queue".format(ACCOUNT_ID),
-    )
-
-    stack = conn.describe_stacks()[0]
-    [n.value for n in stack.notification_arns].should.contain(
-        "arn:aws:sns:us-east-1:{}:fake-queue".format(ACCOUNT_ID)
-    )
-
-
-@mock_cloudformation_deprecated
-@mock_s3_deprecated
-def test_create_stack_from_s3_url():
-    s3_conn = boto.s3.connect_to_region("us-west-1")
-    bucket = s3_conn.create_bucket("foobar", location="us-west-1")
-    key = boto.s3.key.Key(bucket)
-    key.key = "template-key"
-    key.set_contents_from_string(dummy_template_json)
-    key_url = key.generate_url(expires_in=0, query_auth=False)
-
-    conn = boto.cloudformation.connect_to_region("us-west-1")
-    conn.create_stack("new-stack", template_url=key_url)
-
-    stack = conn.describe_stacks()[0]
-    stack.stack_name.should.equal("new-stack")
-    stack.get_template().should.equal(
-        {
-            "GetTemplateResponse": {
-                "GetTemplateResult": {
-                    "TemplateBody": dummy_template_json,
-                    "ResponseMetadata": {
-                        "RequestId": "2d06e36c-ac1d-11e0-a958-f9382b6eb86bEXAMPLE"
-                    },
-                }
-            }
-        }
-    )
-
-
-@mock_cloudformation_deprecated
-def test_describe_stack_by_name():
-    conn = boto.connect_cloudformation()
-    conn.create_stack("test_stack", template_body=dummy_template_json)
-
-    stack = conn.describe_stacks("test_stack")[0]
-    stack.stack_name.should.equal("test_stack")
-
-
-@mock_cloudformation_deprecated
-def test_describe_stack_by_stack_id():
-    conn = boto.connect_cloudformation()
-    conn.create_stack("test_stack", template_body=dummy_template_json)
-
-    stack = conn.describe_stacks("test_stack")[0]
-    stack_by_id = conn.describe_stacks(stack.stack_id)[0]
-    stack_by_id.stack_id.should.equal(stack.stack_id)
-    stack_by_id.stack_name.should.equal("test_stack")
-
-
-@mock_cloudformation_deprecated
-def test_describe_deleted_stack():
-    conn = boto.connect_cloudformation()
-    conn.create_stack("test_stack", template_body=dummy_template_json)
-
-    stack = conn.describe_stacks("test_stack")[0]
-    stack_id = stack.stack_id
-    conn.delete_stack(stack.stack_id)
-    stack_by_id = conn.describe_stacks(stack_id)[0]
-    stack_by_id.stack_id.should.equal(stack.stack_id)
-    stack_by_id.stack_name.should.equal("test_stack")
-    stack_by_id.stack_status.should.equal("DELETE_COMPLETE")
-
-
-@mock_cloudformation_deprecated
+@mock_cloudformation
 def test_get_template_by_name():
-    conn = boto.connect_cloudformation()
-    conn.create_stack("test_stack", template_body=dummy_template_json)
+    conn = boto3.client("cloudformation", region_name="us-east-1")
+    conn.create_stack(StackName="test_stack", TemplateBody=dummy_template_json)
 
-    template = conn.get_template("test_stack")
-    template.should.equal(
-        {
-            "GetTemplateResponse": {
-                "GetTemplateResult": {
-                    "TemplateBody": dummy_template_json,
-                    "ResponseMetadata": {
-                        "RequestId": "2d06e36c-ac1d-11e0-a958-f9382b6eb86bEXAMPLE"
-                    },
-                }
-            }
-        }
-    )
+    template = conn.get_template(StackName="test_stack")["TemplateBody"]
+    template.should.equal(json.loads(dummy_template_json))
 
 
-@mock_cloudformation_deprecated
-def test_list_stacks():
-    conn = boto.connect_cloudformation()
-    conn.create_stack("test_stack", template_body=dummy_template_json)
-    conn.create_stack("test_stack2", template_body=dummy_template_json)
-
-    stacks = conn.list_stacks()
-    stacks.should.have.length_of(2)
-    stacks[0].template_description.should.equal("Stack 1")
-
-
-@mock_cloudformation_deprecated
-def test_delete_stack_by_name():
-    conn = boto.connect_cloudformation()
-    conn.create_stack("test_stack", template_body=dummy_template_json)
-
-    conn.describe_stacks().should.have.length_of(1)
-    conn.delete_stack("test_stack")
-    conn.describe_stacks().should.have.length_of(0)
-
-
-@mock_cloudformation_deprecated
+@mock_cloudformation
 def test_delete_stack_by_id():
-    conn = boto.connect_cloudformation()
-    stack_id = conn.create_stack("test_stack", template_body=dummy_template_json)
+    conn = boto3.client("cloudformation", region_name="us-east-1")
+    stack_id = conn.create_stack(
+        StackName="test_stack", TemplateBody=dummy_template_json
+    )["StackId"]
 
-    conn.describe_stacks().should.have.length_of(1)
-    conn.delete_stack(stack_id)
-    conn.describe_stacks().should.have.length_of(0)
-    with assert_raises(BotoServerError):
-        conn.describe_stacks("test_stack")
+    conn.describe_stacks()["Stacks"].should.have.length_of(1)
+    conn.delete_stack(StackName=stack_id)
+    conn.describe_stacks()["Stacks"].should.have.length_of(0)
+    with assert_raises(ClientError):
+        conn.describe_stacks(StackName="test_stack")
 
-    conn.describe_stacks(stack_id).should.have.length_of(1)
+    conn.describe_stacks(StackName=stack_id)["Stacks"].should.have.length_of(1)
 
 
-@mock_cloudformation_deprecated
+@mock_cloudformation
 def test_delete_stack_with_resource_missing_delete_attr():
-    conn = boto.connect_cloudformation()
-    conn.create_stack("test_stack", template_body=dummy_template_json3)
+    conn = boto3.client("cloudformation", region_name="us-east-1")
+    conn.create_stack(StackName="test_stack", TemplateBody=dummy_template_json3)
 
-    conn.describe_stacks().should.have.length_of(1)
-    conn.delete_stack("test_stack")
-    conn.describe_stacks().should.have.length_of(0)
-
-
-@mock_cloudformation_deprecated
-def test_bad_describe_stack():
-    conn = boto.connect_cloudformation()
-    with assert_raises(BotoServerError):
-        conn.describe_stacks("bad_stack")
+    conn.describe_stacks()["Stacks"].should.have.length_of(1)
+    conn.delete_stack(StackName="test_stack")
+    conn.describe_stacks()["Stacks"].should.have.length_of(0)
 
 
-@mock_cloudformation_deprecated()
-def test_cloudformation_params():
-    dummy_template = {
-        "AWSTemplateFormatVersion": "2010-09-09",
-        "Description": "Stack 1",
-        "Resources": {},
-        "Parameters": {
-            "APPNAME": {
-                "Default": "app-name",
-                "Description": "The name of the app",
-                "Type": "String",
-            }
-        },
-    }
-    dummy_template_json = json.dumps(dummy_template)
-    cfn = boto.connect_cloudformation()
-    cfn.create_stack(
-        "test_stack1",
-        template_body=dummy_template_json,
-        parameters=[("APPNAME", "testing123")],
-    )
-    stack = cfn.describe_stacks("test_stack1")[0]
-    stack.parameters.should.have.length_of(1)
-    param = stack.parameters[0]
-    param.key.should.equal("APPNAME")
-    param.value.should.equal("testing123")
-
-
-@mock_cloudformation_deprecated
+@mock_cloudformation
 def test_cloudformation_params_conditions_and_resources_are_distinct():
     dummy_template = {
         "AWSTemplateFormatVersion": "2010-09-09",
@@ -325,78 +154,21 @@ def test_cloudformation_params_conditions_and_resources_are_distinct():
         },
     }
     dummy_template_json = json.dumps(dummy_template)
-    cfn = boto.connect_cloudformation()
+    cfn = boto3.client("cloudformation", region_name="us-east-1")
     cfn.create_stack(
-        "test_stack1",
-        template_body=dummy_template_json,
-        parameters=[("FooEnabled", "true")],
+        StackName="test_stack1",
+        TemplateBody=dummy_template_json,
+        Parameters=[{"ParameterKey": "FooEnabled", "ParameterValue": "true"}],
     )
-    stack = cfn.describe_stacks("test_stack1")[0]
-    resources = stack.list_resources()
+    resources = cfn.list_stack_resources(StackName="test_stack1")[
+        "StackResourceSummaries"
+    ]
     assert not [
-        resource for resource in resources if resource.logical_resource_id == "Bar"
+        resource for resource in resources if resource["LogicalResourceId"] == "Bar"
     ]
 
 
-@mock_cloudformation_deprecated
-def test_stack_tags():
-    conn = boto.connect_cloudformation()
-    conn.create_stack(
-        "test_stack",
-        template_body=dummy_template_json,
-        tags={"foo": "bar", "baz": "bleh"},
-    )
-
-    stack = conn.describe_stacks()[0]
-    dict(stack.tags).should.equal({"foo": "bar", "baz": "bleh"})
-
-
-@mock_cloudformation_deprecated
-def test_update_stack():
-    conn = boto.connect_cloudformation()
-    conn.create_stack("test_stack", template_body=dummy_template_json)
-
-    conn.update_stack("test_stack", dummy_template_json2)
-
-    stack = conn.describe_stacks()[0]
-    stack.stack_status.should.equal("UPDATE_COMPLETE")
-    stack.get_template().should.equal(
-        {
-            "GetTemplateResponse": {
-                "GetTemplateResult": {
-                    "TemplateBody": dummy_template_json2,
-                    "ResponseMetadata": {
-                        "RequestId": "2d06e36c-ac1d-11e0-a958-f9382b6eb86bEXAMPLE"
-                    },
-                }
-            }
-        }
-    )
-
-
-@mock_cloudformation_deprecated
-def test_update_stack_with_previous_template():
-    conn = boto.connect_cloudformation()
-    conn.create_stack("test_stack", template_body=dummy_template_json)
-    conn.update_stack("test_stack", use_previous_template=True)
-
-    stack = conn.describe_stacks()[0]
-    stack.stack_status.should.equal("UPDATE_COMPLETE")
-    stack.get_template().should.equal(
-        {
-            "GetTemplateResponse": {
-                "GetTemplateResult": {
-                    "TemplateBody": dummy_template_json,
-                    "ResponseMetadata": {
-                        "RequestId": "2d06e36c-ac1d-11e0-a958-f9382b6eb86bEXAMPLE"
-                    },
-                }
-            }
-        }
-    )
-
-
-@mock_cloudformation_deprecated
+@mock_cloudformation
 def test_update_stack_with_parameters():
     dummy_template = {
         "AWSTemplateFormatVersion": "2010-09-09",
@@ -410,104 +182,66 @@ def test_update_stack_with_parameters():
         "Parameters": {"Bar": {"Type": "String"}},
     }
     dummy_template_json = json.dumps(dummy_template)
-    conn = boto.connect_cloudformation()
+    conn = boto3.client("cloudformation", region_name="us-east-1")
     conn.create_stack(
-        "test_stack",
-        template_body=dummy_template_json,
-        parameters=[("Bar", "192.168.0.0/16")],
+        StackName="test_stack",
+        TemplateBody=dummy_template_json,
+        Parameters=[{"ParameterKey": "Bar", "ParameterValue": "192.168.0.0/16"}],
     )
     conn.update_stack(
-        "test_stack",
-        template_body=dummy_template_json,
-        parameters=[("Bar", "192.168.0.1/16")],
+        StackName="test_stack",
+        TemplateBody=dummy_template_json,
+        Parameters=[{"ParameterKey": "Bar", "ParameterValue": "192.168.0.1/16"}],
     )
 
-    stack = conn.describe_stacks()[0]
-    assert stack.parameters[0].value == "192.168.0.1/16"
+    stack = conn.describe_stacks()["Stacks"][0]
+    assert stack["Parameters"][0]["ParameterValue"] == "192.168.0.1/16"
 
 
-@mock_cloudformation_deprecated
+@mock_cloudformation
 def test_update_stack_replace_tags():
-    conn = boto.connect_cloudformation()
+    conn = boto3.client("cloudformation", region_name="us-east-1")
     conn.create_stack(
-        "test_stack", template_body=dummy_template_json, tags={"foo": "bar"}
+        StackName="test_stack",
+        TemplateBody=dummy_template_json,
+        Tags=[{"Key": "foo", "Value": "bar"}],
     )
     conn.update_stack(
-        "test_stack", template_body=dummy_template_json, tags={"foo": "baz"}
+        StackName="test_stack",
+        TemplateBody=dummy_template_json,
+        Tags=[{"Key": "foo", "Value": "baz"}],
     )
 
-    stack = conn.describe_stacks()[0]
-    stack.stack_status.should.equal("UPDATE_COMPLETE")
+    stack = conn.describe_stacks()["Stacks"][0]
+    stack["StackStatus"].should.equal("UPDATE_COMPLETE")
     # since there is one tag it doesn't come out as a list
-    dict(stack.tags).should.equal({"foo": "baz"})
+    stack["Tags"][0]["Value"].should.equal("baz")
 
 
-@mock_cloudformation_deprecated
+@mock_cloudformation
 def test_update_stack_when_rolled_back():
-    conn = boto.connect_cloudformation()
-    stack_id = conn.create_stack("test_stack", template_body=dummy_template_json)
+    region_name = "us-east-1"
+    conn = boto3.client("cloudformation", region_name=region_name)
+    stack_id = conn.create_stack(
+        StackName="test_stack", TemplateBody=dummy_template_json
+    )["StackId"]
 
-    cloudformation_backends[conn.region.name].stacks[
-        stack_id
-    ].status = "ROLLBACK_COMPLETE"
+    cloudformation_backends[region_name].stacks[stack_id].status = "ROLLBACK_COMPLETE"
 
-    with assert_raises(BotoServerError) as err:
-        conn.update_stack("test_stack", dummy_template_json)
+    with assert_raises(ClientError) as err:
+        conn.update_stack(StackName="test_stack", TemplateBody=dummy_template_json)
 
-    ex = err.exception
-    ex.body.should.match(r"is in ROLLBACK_COMPLETE state and can not be updated")
-    ex.error_code.should.equal("ValidationError")
-    ex.reason.should.equal("Bad Request")
-    ex.status.should.equal(400)
-
-
-@mock_cloudformation_deprecated
-def test_describe_stack_events_shows_create_update_and_delete():
-    conn = boto.connect_cloudformation()
-    stack_id = conn.create_stack("test_stack", template_body=dummy_template_json)
-    conn.update_stack(stack_id, template_body=dummy_template_json2)
-    conn.delete_stack(stack_id)
-
-    # assert begins and ends with stack events
-    events = conn.describe_stack_events(stack_id)
-    events[0].resource_type.should.equal("AWS::CloudFormation::Stack")
-    events[-1].resource_type.should.equal("AWS::CloudFormation::Stack")
-
-    # testing ordering of stack events without assuming resource events will not exist
-    # the AWS API returns events in reverse chronological order
-    stack_events_to_look_for = iter(
-        [
-            ("DELETE_COMPLETE", None),
-            ("DELETE_IN_PROGRESS", "User Initiated"),
-            ("UPDATE_COMPLETE", None),
-            ("UPDATE_IN_PROGRESS", "User Initiated"),
-            ("CREATE_COMPLETE", None),
-            ("CREATE_IN_PROGRESS", "User Initiated"),
-        ]
+    ex = err.exception.response
+    ex["Error"]["Message"].should.match(
+        r"is in ROLLBACK_COMPLETE state and can not be updated"
     )
-    try:
-        for event in events:
-            event.stack_id.should.equal(stack_id)
-            event.stack_name.should.equal("test_stack")
-            event.event_id.should.match(r"[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}")
-
-            if event.resource_type == "AWS::CloudFormation::Stack":
-                event.logical_resource_id.should.equal("test_stack")
-                event.physical_resource_id.should.equal(stack_id)
-
-                status_to_look_for, reason_to_look_for = next(stack_events_to_look_for)
-                event.resource_status.should.equal(status_to_look_for)
-                if reason_to_look_for is not None:
-                    event.resource_status_reason.should.equal(reason_to_look_for)
-    except StopIteration:
-        assert False, "Too many stack events"
-
-    list(stack_events_to_look_for).should.be.empty
+    ex["Error"]["Code"].should.equal("ValidationError")
+    ex["ResponseMetadata"]["HTTPStatusCode"].should.equal(400)
 
 
-@mock_cloudformation_deprecated
+@mock_cloudformation
 def test_create_stack_lambda_and_dynamodb():
-    conn = boto.connect_cloudformation()
+    conn = boto3.client("cloudformation", region_name="us-east-1")
     dummy_template = {
         "AWSTemplateFormatVersion": "2010-09-09",
         "Description": "Stack Lambda Test 1",
@@ -559,21 +293,23 @@ def test_create_stack_lambda_and_dynamodb():
     try:
         os.environ["VALIDATE_LAMBDA_S3"] = "false"
         conn.create_stack(
-            "test_stack_lambda_1",
-            template_body=json.dumps(dummy_template),
-            parameters={}.items(),
+            StackName="test_stack_lambda_1",
+            TemplateBody=json.dumps(dummy_template),
+            Parameters=[],
         )
     finally:
         os.environ["VALIDATE_LAMBDA_S3"] = validate_s3_before
 
-    stack = conn.describe_stacks()[0]
-    resources = stack.list_resources()
+    stack = conn.describe_stacks()["Stacks"][0]
+    resources = conn.list_stack_resources(StackName="test_stack_lambda_1")[
+        "StackResourceSummaries"
+    ]
     assert len(resources) == 4
 
 
-@mock_cloudformation_deprecated
+@mock_cloudformation
 def test_create_stack_kinesis():
-    conn = boto.connect_cloudformation()
+    conn = boto3.client("cloudformation", region_name="us-east-1")
     dummy_template = {
         "AWSTemplateFormatVersion": "2010-09-09",
         "Description": "Stack Kinesis Test 1",
@@ -586,13 +322,15 @@ def test_create_stack_kinesis():
         },
     }
     conn.create_stack(
-        "test_stack_kinesis_1",
-        template_body=json.dumps(dummy_template),
-        parameters={}.items(),
+        StackName="test_stack_kinesis_1",
+        TemplateBody=json.dumps(dummy_template),
+        Parameters=[],
     )
 
-    stack = conn.describe_stacks()[0]
-    resources = stack.list_resources()
+    stack = conn.describe_stacks()["Stacks"][0]
+    resources = conn.list_stack_resources(StackName="test_stack_kinesis_1")[
+        "StackResourceSummaries"
+    ]
     assert len(resources) == 1
 
 

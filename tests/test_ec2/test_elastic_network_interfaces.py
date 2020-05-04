@@ -12,7 +12,7 @@ import boto.ec2
 from boto.exception import EC2ResponseError
 import sure  # noqa
 
-from moto import mock_ec2, mock_cloudformation_deprecated, mock_ec2_deprecated
+from moto import mock_ec2, mock_cloudformation, mock_ec2_deprecated
 from tests.helpers import requires_boto_gte
 from tests.test_cloudformation.fixtures import vpc_eni
 import json
@@ -503,25 +503,31 @@ def test_elastic_network_interfaces_describe_network_interfaces_with_filter():
     response["NetworkInterfaces"][0]["Description"].should.equal(eni1.description)
 
 
-@mock_ec2_deprecated
-@mock_cloudformation_deprecated
+@mock_ec2
+@mock_cloudformation
 def test_elastic_network_interfaces_cloudformation():
     template = vpc_eni.template
     template_json = json.dumps(template)
-    conn = boto.cloudformation.connect_to_region("us-west-1")
-    conn.create_stack("test_stack", template_body=template_json)
-    ec2_conn = boto.ec2.connect_to_region("us-west-1")
-    eni = ec2_conn.get_all_network_interfaces()[0]
-    eni.private_ip_addresses.should.have.length_of(1)
+    conn = boto3.client("cloudformation", region_name="us-west-1")
+    conn.create_stack(StackName="test_stack", TemplateBody=template_json)
+    ec2_conn = boto3.client("ec2", region_name="us-west-1")
+    eni = ec2_conn.describe_network_interfaces()["NetworkInterfaces"][0]
+    eni["PrivateIpAddresses"].should.have.length_of(1)
 
-    stack = conn.describe_stacks()[0]
-    resources = stack.describe_resources()
+    stack = conn.describe_stacks()["Stacks"][0]
+    resources = conn.list_stack_resources(StackName="test_stack")[
+        "StackResourceSummaries"
+    ]
     cfn_eni = [
         resource
         for resource in resources
-        if resource.resource_type == "AWS::EC2::NetworkInterface"
+        if resource["ResourceType"] == "AWS::EC2::NetworkInterface"
     ][0]
-    cfn_eni.physical_resource_id.should.equal(eni.id)
+    cfn_eni["PhysicalResourceId"].should.equal(eni["NetworkInterfaceId"])
 
-    outputs = {output.key: output.value for output in stack.outputs}
-    outputs["ENIIpAddress"].should.equal(eni.private_ip_addresses[0].private_ip_address)
+    outputs = {
+        output["OutputKey"]: output["OutputValue"] for output in stack["Outputs"]
+    }
+    outputs["ENIIpAddress"].should.equal(
+        eni["PrivateIpAddresses"][0]["PrivateIpAddress"]
+    )

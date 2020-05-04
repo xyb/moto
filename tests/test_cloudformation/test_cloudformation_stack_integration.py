@@ -17,32 +17,27 @@ import boto.sns
 import boto.sqs
 import boto.vpc
 import boto3
+from botocore.exceptions import ClientError
 import sure  # noqa
 
 from moto import (
-    mock_autoscaling_deprecated,
+    mock_autoscaling,
     mock_cloudformation,
-    mock_cloudformation_deprecated,
-    mock_datapipeline_deprecated,
+    mock_datapipeline,
     mock_dynamodb2,
     mock_ec2,
-    mock_ec2_deprecated,
     mock_elb,
-    mock_elb_deprecated,
     mock_events,
-    mock_iam_deprecated,
+    mock_iam,
     mock_kms,
     mock_lambda,
     mock_logs,
-    mock_rds_deprecated,
     mock_rds2,
     mock_redshift,
-    mock_redshift_deprecated,
-    mock_route53_deprecated,
+    mock_route53,
     mock_s3,
-    mock_sns_deprecated,
+    mock_sns,
     mock_sqs,
-    mock_sqs_deprecated,
     mock_elbv2,
 )
 from moto.core import ACCOUNT_ID
@@ -63,7 +58,7 @@ from .fixtures import (
 )
 
 
-@mock_cloudformation_deprecated()
+@mock_cloudformation
 def test_stack_sqs_integration():
     sqs_template = {
         "AWSTemplateFormatVersion": "2010-09-09",
@@ -76,42 +71,19 @@ def test_stack_sqs_integration():
     }
     sqs_template_json = json.dumps(sqs_template)
 
-    conn = boto.cloudformation.connect_to_region("us-west-1")
-    conn.create_stack("test_stack", template_body=sqs_template_json)
+    conn = boto3.client("cloudformation", region_name="us-west-1")
+    conn.create_stack(StackName="test_stack", TemplateBody=sqs_template_json)
 
-    stack = conn.describe_stacks()[0]
-    queue = stack.describe_resources()[0]
-    queue.resource_type.should.equal("AWS::SQS::Queue")
-    queue.logical_resource_id.should.equal("QueueGroup")
-    queue.physical_resource_id.should.equal("my-queue")
-
-
-@mock_cloudformation_deprecated()
-def test_stack_list_resources():
-    sqs_template = {
-        "AWSTemplateFormatVersion": "2010-09-09",
-        "Resources": {
-            "QueueGroup": {
-                "Type": "AWS::SQS::Queue",
-                "Properties": {"QueueName": "my-queue", "VisibilityTimeout": 60},
-            }
-        },
-    }
-    sqs_template_json = json.dumps(sqs_template)
-
-    conn = boto.cloudformation.connect_to_region("us-west-1")
-    conn.create_stack("test_stack", template_body=sqs_template_json)
-
-    resources = conn.list_stack_resources("test_stack")
-    assert len(resources) == 1
-    queue = resources[0]
-    queue.resource_type.should.equal("AWS::SQS::Queue")
-    queue.logical_resource_id.should.equal("QueueGroup")
-    queue.physical_resource_id.should.equal("my-queue")
+    queue = conn.list_stack_resources(StackName="test_stack")["StackResourceSummaries"][
+        0
+    ]
+    queue["ResourceType"].should.equal("AWS::SQS::Queue")
+    queue["LogicalResourceId"].should.equal("QueueGroup")
+    queue["PhysicalResourceId"].should.equal("my-queue")
 
 
-@mock_cloudformation_deprecated()
-@mock_sqs_deprecated()
+@mock_cloudformation
+@mock_sqs
 def test_update_stack():
     sqs_template = {
         "AWSTemplateFormatVersion": "2010-09-09",
@@ -124,29 +96,29 @@ def test_update_stack():
     }
     sqs_template_json = json.dumps(sqs_template)
 
-    conn = boto.cloudformation.connect_to_region("us-west-1")
-    conn.create_stack("test_stack", template_body=sqs_template_json)
+    conn = boto3.client("cloudformation", region_name="us-west-1")
+    conn.create_stack(StackName="test_stack", TemplateBody=sqs_template_json)
 
-    sqs_conn = boto.sqs.connect_to_region("us-west-1")
-    queues = sqs_conn.get_all_queues()
+    sqs_conn = boto3.client("sqs", region_name="us-west-1")
+    queues = sqs_conn.list_queues()["QueueUrls"]
     queues.should.have.length_of(1)
-    queues[0].get_attributes("VisibilityTimeout")["VisibilityTimeout"].should.equal(
-        "60"
-    )
+    sqs_conn.get_queue_attributes(
+        QueueUrl=queues[0], AttributeNames=["VisibilityTimeout"]
+    )["Attributes"]["VisibilityTimeout"].should.equal("60")
 
     sqs_template["Resources"]["QueueGroup"]["Properties"]["VisibilityTimeout"] = 100
     sqs_template_json = json.dumps(sqs_template)
-    conn.update_stack("test_stack", sqs_template_json)
+    conn.update_stack(StackName="test_stack", TemplateBody=sqs_template_json)
 
-    queues = sqs_conn.get_all_queues()
+    queues = sqs_conn.list_queues()["QueueUrls"]
     queues.should.have.length_of(1)
-    queues[0].get_attributes("VisibilityTimeout")["VisibilityTimeout"].should.equal(
-        "100"
-    )
+    sqs_conn.get_queue_attributes(
+        QueueUrl=queues[0], AttributeNames=["VisibilityTimeout"]
+    )["Attributes"]["VisibilityTimeout"].should.equal("100")
 
 
-@mock_cloudformation_deprecated()
-@mock_sqs_deprecated()
+@mock_cloudformation
+@mock_sqs
 def test_update_stack_and_remove_resource():
     sqs_template = {
         "AWSTemplateFormatVersion": "2010-09-09",
@@ -159,33 +131,31 @@ def test_update_stack_and_remove_resource():
     }
     sqs_template_json = json.dumps(sqs_template)
 
-    conn = boto.cloudformation.connect_to_region("us-west-1")
-    conn.create_stack("test_stack", template_body=sqs_template_json)
+    conn = boto3.client("cloudformation", region_name="us-west-1")
+    conn.create_stack(StackName="test_stack", TemplateBody=sqs_template_json)
 
-    sqs_conn = boto.sqs.connect_to_region("us-west-1")
-    queues = sqs_conn.get_all_queues()
+    sqs_conn = boto3.client("sqs", region_name="us-west-1")
+    queues = sqs_conn.list_queues()["QueueUrls"]
     queues.should.have.length_of(1)
 
     sqs_template["Resources"].pop("QueueGroup")
     sqs_template_json = json.dumps(sqs_template)
-    conn.update_stack("test_stack", sqs_template_json)
+    conn.update_stack(StackName="test_stack", TemplateBody=sqs_template_json)
 
-    queues = sqs_conn.get_all_queues()
-    queues.should.have.length_of(0)
+    assert "QueueUrls" not in sqs_conn.list_queues()
 
 
-@mock_cloudformation_deprecated()
-@mock_sqs_deprecated()
+@mock_cloudformation
+@mock_sqs
 def test_update_stack_and_add_resource():
     sqs_template = {"AWSTemplateFormatVersion": "2010-09-09", "Resources": {}}
     sqs_template_json = json.dumps(sqs_template)
 
-    conn = boto.cloudformation.connect_to_region("us-west-1")
-    conn.create_stack("test_stack", template_body=sqs_template_json)
+    conn = boto3.client("cloudformation", region_name="us-west-1")
+    conn.create_stack(StackName="test_stack", TemplateBody=sqs_template_json)
 
-    sqs_conn = boto.sqs.connect_to_region("us-west-1")
-    queues = sqs_conn.get_all_queues()
-    queues.should.have.length_of(0)
+    sqs_conn = boto3.client("sqs", region_name="us-west-1")
+    assert "QueueUrls" not in sqs_conn.list_queues()
 
     sqs_template = {
         "AWSTemplateFormatVersion": "2010-09-09",
@@ -197,14 +167,14 @@ def test_update_stack_and_add_resource():
         },
     }
     sqs_template_json = json.dumps(sqs_template)
-    conn.update_stack("test_stack", sqs_template_json)
+    conn.update_stack(StackName="test_stack", TemplateBody=sqs_template_json)
 
-    queues = sqs_conn.get_all_queues()
+    queues = sqs_conn.list_queues()["QueueUrls"]
     queues.should.have.length_of(1)
 
 
-@mock_ec2_deprecated()
-@mock_cloudformation_deprecated()
+@mock_ec2
+@mock_cloudformation
 def test_stack_ec2_integration():
     ec2_template = {
         "AWSTemplateFormatVersion": "2010-09-09",
@@ -217,23 +187,25 @@ def test_stack_ec2_integration():
     }
     ec2_template_json = json.dumps(ec2_template)
 
-    conn = boto.cloudformation.connect_to_region("us-west-1")
-    conn.create_stack("ec2_stack", template_body=ec2_template_json)
+    conn = boto3.client("cloudformation", region_name="us-west-1")
+    conn.create_stack(StackName="ec2_stack", TemplateBody=ec2_template_json)
 
-    ec2_conn = boto.ec2.connect_to_region("us-west-1")
-    reservation = ec2_conn.get_all_instances()[0]
-    ec2_instance = reservation.instances[0]
+    ec2_conn = boto3.client("ec2", region_name="us-west-1")
+    reservation = ec2_conn.describe_instances()["Reservations"][0]
+    ec2_instance = reservation["Instances"][0]
 
-    stack = conn.describe_stacks()[0]
-    instance = stack.describe_resources()[0]
-    instance.resource_type.should.equal("AWS::EC2::Instance")
-    instance.logical_resource_id.should.contain("WebServerGroup")
-    instance.physical_resource_id.should.equal(ec2_instance.id)
+    stack = conn.describe_stacks()["Stacks"][0]
+    instance = conn.list_stack_resources(StackName="ec2_stack")[
+        "StackResourceSummaries"
+    ][0]
+    instance["ResourceType"].should.equal("AWS::EC2::Instance")
+    instance["LogicalResourceId"].should.contain("WebServerGroup")
+    instance["PhysicalResourceId"].should.equal(ec2_instance["InstanceId"])
 
 
-@mock_ec2_deprecated()
-@mock_elb_deprecated()
-@mock_cloudformation_deprecated()
+@mock_ec2
+@mock_elb
+@mock_cloudformation
 def test_stack_elb_integration_with_attached_ec2_instances():
     elb_template = {
         "AWSTemplateFormatVersion": "2010-09-09",
@@ -261,22 +233,24 @@ def test_stack_elb_integration_with_attached_ec2_instances():
     }
     elb_template_json = json.dumps(elb_template)
 
-    conn = boto.cloudformation.connect_to_region("us-west-1")
-    conn.create_stack("elb_stack", template_body=elb_template_json)
+    conn = boto3.client("cloudformation", region_name="us-west-1")
+    conn.create_stack(StackName="elb_stack", TemplateBody=elb_template_json)
 
-    elb_conn = boto.ec2.elb.connect_to_region("us-west-1")
-    load_balancer = elb_conn.get_all_load_balancers()[0]
+    elb_conn = boto3.client("elb", region_name="us-west-1")
+    load_balancer = elb_conn.describe_load_balancers(LoadBalancerNames=["test-elb"])[
+        "LoadBalancerDescriptions"
+    ][0]
 
-    ec2_conn = boto.ec2.connect_to_region("us-west-1")
-    reservation = ec2_conn.get_all_instances()[0]
-    ec2_instance = reservation.instances[0]
+    ec2_conn = boto3.client("ec2", region_name="us-west-1")
+    reservation = ec2_conn.describe_instances()["Reservations"][0]
+    ec2_instance = reservation["Instances"][0]
 
-    load_balancer.instances[0].id.should.equal(ec2_instance.id)
-    list(load_balancer.availability_zones).should.equal(["us-east-1"])
+    load_balancer["Instances"][0]["InstanceId"].should.equal(ec2_instance["InstanceId"])
+    list(load_balancer["AvailabilityZones"]).should.equal(["us-east-1"])
 
 
-@mock_elb_deprecated()
-@mock_cloudformation_deprecated()
+@mock_elb
+@mock_cloudformation
 def test_stack_elb_integration_with_health_check():
     elb_template = {
         "AWSTemplateFormatVersion": "2010-09-09",
@@ -306,22 +280,24 @@ def test_stack_elb_integration_with_health_check():
     }
     elb_template_json = json.dumps(elb_template)
 
-    conn = boto.cloudformation.connect_to_region("us-west-1")
-    conn.create_stack("elb_stack", template_body=elb_template_json)
+    conn = boto3.client("cloudformation", region_name="us-west-1")
+    conn.create_stack(StackName="elb_stack", TemplateBody=elb_template_json)
 
-    elb_conn = boto.ec2.elb.connect_to_region("us-west-1")
-    load_balancer = elb_conn.get_all_load_balancers()[0]
-    health_check = load_balancer.health_check
+    elb_conn = boto3.client("elb", region_name="us-west-1")
+    load_balancer = elb_conn.describe_load_balancers(LoadBalancerNames=["test-elb"])[
+        "LoadBalancerDescriptions"
+    ][0]
+    health_check = load_balancer["HealthCheck"]
 
-    health_check.healthy_threshold.should.equal(3)
-    health_check.interval.should.equal(5)
-    health_check.target.should.equal("HTTP:80/healthcheck")
-    health_check.timeout.should.equal(4)
-    health_check.unhealthy_threshold.should.equal(2)
+    health_check["HealthyThreshold"].should.equal(3)
+    health_check["Interval"].should.equal(5)
+    health_check["Target"].should.equal("HTTP:80/healthcheck")
+    health_check["Timeout"].should.equal(4)
+    health_check["UnhealthyThreshold"].should.equal(2)
 
 
-@mock_elb_deprecated()
-@mock_cloudformation_deprecated()
+@mock_elb
+@mock_cloudformation
 def test_stack_elb_integration_with_update():
     elb_template = {
         "AWSTemplateFormatVersion": "2010-09-09",
@@ -345,70 +321,75 @@ def test_stack_elb_integration_with_update():
     }
     elb_template_json = json.dumps(elb_template)
 
-    conn = boto.cloudformation.connect_to_region("us-west-1")
-    conn.create_stack("elb_stack", template_body=elb_template_json)
+    conn = boto3.client("cloudformation", region_name="us-west-1")
+    conn.create_stack(StackName="elb_stack", TemplateBody=elb_template_json)
 
-    elb_conn = boto.ec2.elb.connect_to_region("us-west-1")
-    load_balancer = elb_conn.get_all_load_balancers()[0]
-    load_balancer.availability_zones[0].should.equal("us-west-1a")
+    elb_conn = boto3.client("elb", region_name="us-west-1")
+    load_balancer = elb_conn.describe_load_balancers(LoadBalancerNames=["test-elb"])[
+        "LoadBalancerDescriptions"
+    ][0]
+    load_balancer["AvailabilityZones"][0].should.equal("us-west-1a")
 
     elb_template["Resources"]["MyELB"]["Properties"]["AvailabilityZones"] = [
         "us-west-1b"
     ]
     elb_template_json = json.dumps(elb_template)
-    conn.update_stack("elb_stack", template_body=elb_template_json)
-    load_balancer = elb_conn.get_all_load_balancers()[0]
-    load_balancer.availability_zones[0].should.equal("us-west-1b")
+    conn.update_stack(StackName="elb_stack", TemplateBody=elb_template_json)
+    load_balancer = elb_conn.describe_load_balancers(LoadBalancerNames=["test-elb"])[
+        "LoadBalancerDescriptions"
+    ][0]
+    load_balancer["AvailabilityZones"][0].should.equal("us-west-1b")
 
 
-@mock_ec2_deprecated()
-@mock_redshift_deprecated()
-@mock_cloudformation_deprecated()
+@mock_ec2
+@mock_redshift
+@mock_cloudformation
 def test_redshift_stack():
     redshift_template_json = json.dumps(redshift.template)
 
-    vpc_conn = boto.vpc.connect_to_region("us-west-2")
-    conn = boto.cloudformation.connect_to_region("us-west-2")
+    ec2_conn = boto3.client("ec2", region_name="us-west-1")
+    conn = boto3.client("cloudformation", region_name="us-west-1")
     conn.create_stack(
-        "redshift_stack",
-        template_body=redshift_template_json,
-        parameters=[
-            ("DatabaseName", "mydb"),
-            ("ClusterType", "multi-node"),
-            ("NumberOfNodes", 2),
-            ("NodeType", "dw1.xlarge"),
-            ("MasterUsername", "myuser"),
-            ("MasterUserPassword", "mypass"),
-            ("InboundTraffic", "10.0.0.1/16"),
-            ("PortNumber", 5439),
+        StackName="redshift_stack",
+        TemplateBody=redshift_template_json,
+        Parameters=[
+            {"ParameterKey": key, "ParameterValue": value}
+            for key, value in [
+                ("DatabaseName", "mydb"),
+                ("ClusterType", "multi-node"),
+                ("NumberOfNodes", "2"),
+                ("NodeType", "dw1.xlarge"),
+                ("MasterUsername", "myuser"),
+                ("MasterUserPassword", "mypass"),
+                ("InboundTraffic", "10.0.0.1/16"),
+                ("PortNumber", "5439"),
+            ]
         ],
     )
 
-    redshift_conn = boto.redshift.connect_to_region("us-west-2")
+    redshift_conn = boto3.client("redshift", region_name="us-west-1")
 
-    cluster_res = redshift_conn.describe_clusters()
-    clusters = cluster_res["DescribeClustersResponse"]["DescribeClustersResult"][
-        "Clusters"
-    ]
+    clusters = redshift_conn.describe_clusters()["Clusters"]
     clusters.should.have.length_of(1)
     cluster = clusters[0]
     cluster["DBName"].should.equal("mydb")
     cluster["NumberOfNodes"].should.equal(2)
     cluster["NodeType"].should.equal("dw1.xlarge")
     cluster["MasterUsername"].should.equal("myuser")
-    cluster["Port"].should.equal(5439)
     cluster["VpcSecurityGroups"].should.have.length_of(1)
     security_group_id = cluster["VpcSecurityGroups"][0]["VpcSecurityGroupId"]
 
-    groups = vpc_conn.get_all_security_groups(group_ids=[security_group_id])
+    groups = ec2_conn.describe_security_groups(GroupIds=[security_group_id])[
+        "SecurityGroups"
+    ]
     groups.should.have.length_of(1)
     group = groups[0]
-    group.rules.should.have.length_of(1)
-    group.rules[0].grants[0].cidr_ip.should.equal("10.0.0.1/16")
+    group["IpPermissions"].should.have.length_of(1)
+    group["IpPermissions"][0]["IpRanges"][0]["CidrIp"].should.equal("10.0.0.1/16")
 
 
-@mock_ec2_deprecated()
-@mock_cloudformation_deprecated()
+@mock_ec2
+@mock_cloudformation
 def test_stack_security_groups():
     security_group_template = {
         "AWSTemplateFormatVersion": "2010-09-09",
@@ -449,44 +430,45 @@ def test_stack_security_groups():
     }
     security_group_template_json = json.dumps(security_group_template)
 
-    conn = boto.cloudformation.connect_to_region("us-west-1")
+    conn = boto3.client("cloudformation", region_name="us-west-1")
     conn.create_stack(
-        "security_group_stack",
-        template_body=security_group_template_json,
-        tags={"foo": "bar"},
+        StackName="security_group_stack",
+        TemplateBody=security_group_template_json,
+        Tags=[{"Key": "foo", "Value": "bar"}],
     )
 
-    ec2_conn = boto.ec2.connect_to_region("us-west-1")
-    instance_group = ec2_conn.get_all_security_groups(
-        filters={"description": ["My security group"]}
-    )[0]
-    other_group = ec2_conn.get_all_security_groups(
-        filters={"description": ["My other group"]}
-    )[0]
+    ec2_conn = boto3.client("ec2", region_name="us-west-1")
+    instance_group = ec2_conn.describe_security_groups(
+        Filters=[{"Name": "description", "Values": ["My security group"]}]
+    )["SecurityGroups"][0]
+    other_group = ec2_conn.describe_security_groups(
+        Filters=[{"Name": "description", "Values": ["My other group"]}]
+    )["SecurityGroups"][0]
 
-    reservation = ec2_conn.get_all_instances()[0]
-    ec2_instance = reservation.instances[0]
+    reservation = ec2_conn.describe_instances()["Reservations"][0]
+    ec2_instance = reservation["Instances"][0]
 
-    ec2_instance.groups[0].id.should.equal(instance_group.id)
-    instance_group.description.should.equal("My security group")
-    instance_group.tags.should.have.key("foo").which.should.equal("bar")
-    instance_group.tags.should.have.key("bar").which.should.equal("baz")
-    rule1, rule2 = instance_group.rules
-    int(rule1.to_port).should.equal(22)
-    int(rule1.from_port).should.equal(22)
-    rule1.grants[0].cidr_ip.should.equal("123.123.123.123/32")
-    rule1.ip_protocol.should.equal("tcp")
+    ec2_instance["SecurityGroups"][0]["GroupId"].should.equal(instance_group["GroupId"])
+    instance_group["Description"].should.equal("My security group")
+    tags = {tag["Key"]: tag["Value"] for tag in instance_group["Tags"]}
+    tags.should.have.key("foo").which.should.equal("bar")
+    tags.should.have.key("bar").which.should.equal("baz")
+    rule1, rule2 = instance_group["IpPermissions"]
+    rule1["ToPort"].should.equal(22)
+    rule1["FromPort"].should.equal(22)
+    rule1["IpRanges"][0]["CidrIp"].should.equal("123.123.123.123/32")
+    rule1["IpProtocol"].should.equal("tcp")
 
-    int(rule2.to_port).should.equal(8000)
-    int(rule2.from_port).should.equal(80)
-    rule2.ip_protocol.should.equal("tcp")
-    rule2.grants[0].group_id.should.equal(other_group.id)
+    rule2["ToPort"].should.equal(8000)
+    rule2["FromPort"].should.equal(80)
+    rule2["UserIdGroupPairs"][0]["GroupId"].should.equal(other_group["GroupId"])
+    rule2["IpProtocol"].should.equal("tcp")
 
 
-@mock_autoscaling_deprecated()
-@mock_elb_deprecated()
-@mock_cloudformation_deprecated()
-@mock_ec2_deprecated()
+@mock_autoscaling
+@mock_elb
+@mock_cloudformation
+@mock_ec2
 def test_autoscaling_group_with_elb():
     web_setup_template = {
         "AWSTemplateFormatVersion": "2010-09-09",
@@ -544,58 +526,67 @@ def test_autoscaling_group_with_elb():
 
     web_setup_template_json = json.dumps(web_setup_template)
 
-    conn = boto.cloudformation.connect_to_region("us-east-1")
-    conn.create_stack("web_stack", template_body=web_setup_template_json)
+    conn = boto3.client("cloudformation", region_name="us-east-1")
+    conn.create_stack(StackName="web_stack", TemplateBody=web_setup_template_json)
 
-    autoscale_conn = boto.ec2.autoscale.connect_to_region("us-east-1")
-    autoscale_group = autoscale_conn.get_all_groups()[0]
-    autoscale_group.launch_config_name.should.contain("my-launch-config")
-    autoscale_group.load_balancers[0].should.equal("my-elb")
+    autoscale_conn = boto3.client("autoscaling", region_name="us-east-1")
+    autoscale_group = autoscale_conn.describe_auto_scaling_groups()[
+        "AutoScalingGroups"
+    ][0]
+    autoscale_group["LaunchConfigurationName"].should.contain("my-launch-config")
+    autoscale_group["LoadBalancerNames"][0].should.equal("my-elb")
 
     # Confirm the Launch config was actually created
-    autoscale_conn.get_all_launch_configurations().should.have.length_of(1)
+    autoscale_conn.describe_launch_configurations()[
+        "LaunchConfigurations"
+    ].should.have.length_of(1)
 
     # Confirm the ELB was actually created
-    elb_conn = boto.ec2.elb.connect_to_region("us-east-1")
-    elb_conn.get_all_load_balancers().should.have.length_of(1)
+    elb_conn = boto3.client("elb", region_name="us-east-1")
+    elb_conn.describe_load_balancers()[
+        "LoadBalancerDescriptions"
+    ].should.have.length_of(1)
 
-    stack = conn.describe_stacks()[0]
-    resources = stack.describe_resources()
+    stack = conn.describe_stacks()["Stacks"][0]
+    resources = conn.list_stack_resources(StackName="web_stack")[
+        "StackResourceSummaries"
+    ]
     as_group_resource = [
         resource
         for resource in resources
-        if resource.resource_type == "AWS::AutoScaling::AutoScalingGroup"
+        if resource["ResourceType"] == "AWS::AutoScaling::AutoScalingGroup"
     ][0]
-    as_group_resource.physical_resource_id.should.contain("my-as-group")
+    as_group_resource["PhysicalResourceId"].should.contain("my-as-group")
 
     launch_config_resource = [
         resource
         for resource in resources
-        if resource.resource_type == "AWS::AutoScaling::LaunchConfiguration"
+        if resource["ResourceType"] == "AWS::AutoScaling::LaunchConfiguration"
     ][0]
-    launch_config_resource.physical_resource_id.should.contain("my-launch-config")
+    launch_config_resource["PhysicalResourceId"].should.contain("my-launch-config")
 
     elb_resource = [
         resource
         for resource in resources
-        if resource.resource_type == "AWS::ElasticLoadBalancing::LoadBalancer"
+        if resource["ResourceType"] == "AWS::ElasticLoadBalancing::LoadBalancer"
     ][0]
-    elb_resource.physical_resource_id.should.contain("my-elb")
+    elb_resource["PhysicalResourceId"].should.contain("my-elb")
 
     # confirm the instances were created with the right tags
-    ec2_conn = boto.ec2.connect_to_region("us-east-1")
-    reservations = ec2_conn.get_all_reservations()
+    ec2_conn = boto3.client("ec2", region_name="us-east-1")
+    reservations = ec2_conn.describe_instances()["Reservations"]
     len(reservations).should.equal(1)
     reservation = reservations[0]
-    len(reservation.instances).should.equal(2)
-    for instance in reservation.instances:
-        instance.tags["propagated-test-tag"].should.equal("propagated-test-tag-value")
-        instance.tags.keys().should_not.contain("not-propagated-test-tag")
+    len(reservation["Instances"]).should.equal(2)
+    for instance in reservation["Instances"]:
+        tags = {tag["Key"]: tag["Value"] for tag in instance["Tags"]}
+        tags["propagated-test-tag"].should.equal("propagated-test-tag-value")
+        tags.keys().should_not.contain("not-propagated-test-tag")
 
 
-@mock_autoscaling_deprecated()
-@mock_cloudformation_deprecated()
-@mock_ec2_deprecated()
+@mock_autoscaling
+@mock_cloudformation
+@mock_ec2
 def test_autoscaling_group_update():
     asg_template = {
         "AWSTemplateFormatVersion": "2010-09-09",
@@ -618,14 +609,14 @@ def test_autoscaling_group_update():
     }
     asg_template_json = json.dumps(asg_template)
 
-    conn = boto.cloudformation.connect_to_region("us-west-1")
-    conn.create_stack("asg_stack", template_body=asg_template_json)
+    conn = boto3.client("cloudformation", region_name="us-west-1")
+    conn.create_stack(StackName="asg_stack", TemplateBody=asg_template_json)
 
-    autoscale_conn = boto.ec2.autoscale.connect_to_region("us-west-1")
-    asg = autoscale_conn.get_all_groups()[0]
-    asg.min_size.should.equal(2)
-    asg.max_size.should.equal(2)
-    asg.desired_capacity.should.equal(2)
+    autoscale_conn = boto3.client("autoscaling", region_name="us-west-1")
+    asg = autoscale_conn.describe_auto_scaling_groups()["AutoScalingGroups"][0]
+    asg["MinSize"].should.equal(2)
+    asg["MaxSize"].should.equal(2)
+    asg["DesiredCapacity"].should.equal(2)
 
     asg_template["Resources"]["my-as-group"]["Properties"]["MaxSize"] = 3
     asg_template["Resources"]["my-as-group"]["Properties"]["Tags"] = [
@@ -641,80 +632,93 @@ def test_autoscaling_group_update():
         },
     ]
     asg_template_json = json.dumps(asg_template)
-    conn.update_stack("asg_stack", template_body=asg_template_json)
-    asg = autoscale_conn.get_all_groups()[0]
-    asg.min_size.should.equal(2)
-    asg.max_size.should.equal(3)
-    asg.desired_capacity.should.equal(2)
+    conn.update_stack(StackName="asg_stack", TemplateBody=asg_template_json)
+    asg = autoscale_conn.describe_auto_scaling_groups()["AutoScalingGroups"][0]
+    asg["MinSize"].should.equal(2)
+    asg["MaxSize"].should.equal(3)
+    asg["DesiredCapacity"].should.equal(2)
 
     # confirm the instances were created with the right tags
-    ec2_conn = boto.ec2.connect_to_region("us-west-1")
-    reservations = ec2_conn.get_all_reservations()
+    ec2_conn = boto3.client("ec2", region_name="us-west-1")
+
+    reservations = ec2_conn.describe_instances()["Reservations"]
     running_instance_count = 0
     for res in reservations:
-        for instance in res.instances:
-            if instance.state == "running":
+        for instance in res["Instances"]:
+            if instance["State"]["Name"] == "running":
                 running_instance_count += 1
-                instance.tags["propagated-test-tag"].should.equal(
-                    "propagated-test-tag-value"
-                )
-                instance.tags.keys().should_not.contain("not-propagated-test-tag")
+                tags = {tag["Key"]: tag["Value"] for tag in instance["Tags"]}
+                tags["propagated-test-tag"].should.equal("propagated-test-tag-value")
+                tags.keys().should_not.contain("not-propagated-test-tag")
     running_instance_count.should.equal(2)
 
 
-@mock_ec2_deprecated()
-@mock_cloudformation_deprecated()
+@mock_ec2
+@mock_cloudformation
 def test_vpc_single_instance_in_subnet():
     template_json = json.dumps(vpc_single_instance_in_subnet.template)
-    conn = boto.cloudformation.connect_to_region("us-west-1")
-    conn.create_stack(
-        "test_stack", template_body=template_json, parameters=[("KeyName", "my_key")]
-    )
+    conn = boto3.client("cloudformation", region_name="us-west-1")
+    stack_id = conn.create_stack(
+        StackName="test_stack",
+        TemplateBody=template_json,
+        Parameters=[{"ParameterKey": "KeyName", "ParameterValue": "my_key"}],
+    )["StackId"]
 
-    vpc_conn = boto.vpc.connect_to_region("us-west-1")
-
-    vpc = vpc_conn.get_all_vpcs(filters={"cidrBlock": "10.0.0.0/16"})[0]
-    vpc.cidr_block.should.equal("10.0.0.0/16")
+    vpc_conn = boto3.client("ec2", region_name="us-west-1")
+    vpc = vpc_conn.describe_vpcs(
+        Filters=[{"Name": "cidrBlock", "Values": ["10.0.0.0/16"]}]
+    )["Vpcs"][0]
+    vpc["CidrBlock"].should.equal("10.0.0.0/16")
 
     # Add this once we implement the endpoint
     # vpc_conn.get_all_internet_gateways().should.have.length_of(1)
 
-    subnet = vpc_conn.get_all_subnets(filters={"vpcId": vpc.id})[0]
-    subnet.vpc_id.should.equal(vpc.id)
+    subnet = vpc_conn.describe_subnets(
+        Filters=[{"Name": "vpcId", "Values": [vpc["VpcId"]]}]
+    )["Subnets"][0]
+    subnet["VpcId"].should.equal(vpc["VpcId"])
 
-    ec2_conn = boto.ec2.connect_to_region("us-west-1")
-    reservation = ec2_conn.get_all_instances()[0]
-    instance = reservation.instances[0]
-    instance.tags["Foo"].should.equal("Bar")
+    ec2_conn = boto3.client("ec2", region_name="us-west-1")
+    reservation = ec2_conn.describe_instances()["Reservations"][0]
+    instance = reservation["Instances"][0]
+    tags = {tag["Key"]: tag["Value"] for tag in instance["Tags"]}
+    tags["Foo"].should.equal("Bar")
     # Check that the EIP is attached the the EC2 instance
-    eip = ec2_conn.get_all_addresses()[0]
-    eip.domain.should.equal("vpc")
-    eip.instance_id.should.equal(instance.id)
+    eip = ec2_conn.describe_addresses()["Addresses"][0]
+    eip["Domain"].should.equal("vpc")
+    eip["InstanceId"].should.equal(instance["InstanceId"])
 
-    security_group = ec2_conn.get_all_security_groups(filters={"vpc_id": [vpc.id]})[0]
-    security_group.vpc_id.should.equal(vpc.id)
+    security_group = ec2_conn.describe_security_groups(
+        Filters=[{"Name": "vpc_id", "Values": [vpc["VpcId"]]}]
+    )["SecurityGroups"][0]
+    security_group["VpcId"].should.equal(vpc["VpcId"])
 
-    stack = conn.describe_stacks()[0]
+    vpc_tags = {tag["Key"]: tag["Value"] for tag in vpc["Tags"]}
+    vpc_tags.should.have.key("Application").which.should.equal(stack_id)
 
-    vpc.tags.should.have.key("Application").which.should.equal(stack.stack_id)
-
-    resources = stack.describe_resources()
+    resources = conn.list_stack_resources(StackName="test_stack")[
+        "StackResourceSummaries"
+    ]
     vpc_resource = [
-        resource for resource in resources if resource.resource_type == "AWS::EC2::VPC"
+        resource
+        for resource in resources
+        if resource["ResourceType"] == "AWS::EC2::VPC"
     ][0]
-    vpc_resource.physical_resource_id.should.equal(vpc.id)
+    vpc_resource["PhysicalResourceId"].should.equal(vpc["VpcId"])
 
     subnet_resource = [
         resource
         for resource in resources
-        if resource.resource_type == "AWS::EC2::Subnet"
+        if resource["ResourceType"] == "AWS::EC2::Subnet"
     ][0]
-    subnet_resource.physical_resource_id.should.equal(subnet.id)
+    subnet_resource["PhysicalResourceId"].should.equal(subnet["SubnetId"])
 
     eip_resource = [
-        resource for resource in resources if resource.resource_type == "AWS::EC2::EIP"
+        resource
+        for resource in resources
+        if resource["ResourceType"] == "AWS::EC2::EIP"
     ][0]
-    eip_resource.physical_resource_id.should.equal(eip.public_ip)
+    eip_resource["PhysicalResourceId"].should.equal(eip["PublicIp"])
 
 
 @mock_cloudformation()
@@ -767,79 +771,99 @@ def test_rds_db_parameter_groups():
     found_cloudformation_set_parameter.should.equal(True)
 
 
-@mock_cloudformation_deprecated()
-@mock_ec2_deprecated()
-@mock_rds_deprecated()
+@mock_cloudformation
+@mock_ec2
+@mock_rds2
 def test_rds_mysql_with_read_replica():
-    ec2_conn = boto.ec2.connect_to_region("us-west-1")
-    ec2_conn.create_security_group("application", "Our Application Group")
+    ec2_conn = boto3.client("ec2", region_name="us-west-1")
+    ec2_conn.create_security_group(
+        GroupName="application", Description="Our Application Group"
+    )
 
     template_json = json.dumps(rds_mysql_with_read_replica.template)
-    conn = boto.cloudformation.connect_to_region("us-west-1")
+    conn = boto3.client("cloudformation", "us-west-1")
     conn.create_stack(
-        "test_stack",
-        template_body=template_json,
-        parameters=[
-            ("DBInstanceIdentifier", "master_db"),
-            ("DBName", "my_db"),
-            ("DBUser", "my_user"),
-            ("DBPassword", "my_password"),
-            ("DBAllocatedStorage", "20"),
-            ("DBInstanceClass", "db.m1.medium"),
-            ("EC2SecurityGroup", "application"),
-            ("MultiAZ", "true"),
+        StackName="test_stack",
+        TemplateBody=template_json,
+        Parameters=[
+            {"ParameterKey": key, "ParameterValue": value}
+            for key, value in [
+                ("DBInstanceIdentifier", "master_db"),
+                ("DBName", "my_db"),
+                ("DBUser", "my_user"),
+                ("DBPassword", "my_password"),
+                ("DBAllocatedStorage", "20"),
+                ("DBInstanceClass", "db.m1.medium"),
+                ("EC2SecurityGroup", "application"),
+                ("MultiAZ", "true"),
+            ]
         ],
     )
 
-    rds_conn = boto.rds.connect_to_region("us-west-1")
+    rds_conn = boto3.client("rds", region_name="us-west-1")
 
-    primary = rds_conn.get_all_dbinstances("master_db")[0]
-    primary.master_username.should.equal("my_user")
-    primary.allocated_storage.should.equal(20)
-    primary.instance_class.should.equal("db.m1.medium")
-    primary.multi_az.should.equal(True)
-    list(primary.read_replica_dbinstance_identifiers).should.have.length_of(1)
-    replica_id = primary.read_replica_dbinstance_identifiers[0]
+    primary = rds_conn.describe_db_instances(DBInstanceIdentifier="master_db")[
+        "DBInstances"
+    ][0]
+    primary["MasterUsername"].should.equal("my_user")
+    primary["AllocatedStorage"].should.equal(20)
+    primary["DBInstanceClass"].should.equal("db.m1.medium")
+    primary["MultiAZ"].should.equal(True)
+    list(primary["ReadReplicaDBInstanceIdentifiers"]).should.have.length_of(1)
+    replica_id = primary["ReadReplicaDBInstanceIdentifiers"][0]
 
-    replica = rds_conn.get_all_dbinstances(replica_id)[0]
-    replica.instance_class.should.equal("db.m1.medium")
+    replica = rds_conn.describe_db_instances(DBInstanceIdentifier=replica_id)[
+        "DBInstances"
+    ][0]
+    replica["DBInstanceClass"].should.equal("db.m1.medium")
 
-    security_group_name = primary.security_groups[0].name
-    security_group = rds_conn.get_all_dbsecurity_groups(security_group_name)[0]
-    security_group.ec2_groups[0].name.should.equal("application")
+    security_group_name = primary["DBSecurityGroups"][0]["DBSecurityGroupName"]
+    security_group = rds_conn.describe_db_security_groups(
+        DBSecurityGroupName=security_group_name
+    )["DBSecurityGroups"][0]
+    security_group["EC2SecurityGroups"][0]["EC2SecurityGroupName"].should.equal(
+        "application"
+    )
 
 
-@mock_cloudformation_deprecated()
-@mock_ec2_deprecated()
-@mock_rds_deprecated()
+@mock_cloudformation
+@mock_ec2
+@mock_rds2
 def test_rds_mysql_with_read_replica_in_vpc():
     template_json = json.dumps(rds_mysql_with_read_replica.template)
-    conn = boto.cloudformation.connect_to_region("eu-central-1")
+    conn = boto3.client("cloudformation", "eu-central-1")
     conn.create_stack(
-        "test_stack",
-        template_body=template_json,
-        parameters=[
-            ("DBInstanceIdentifier", "master_db"),
-            ("DBName", "my_db"),
-            ("DBUser", "my_user"),
-            ("DBPassword", "my_password"),
-            ("DBAllocatedStorage", "20"),
-            ("DBInstanceClass", "db.m1.medium"),
-            ("MultiAZ", "true"),
+        StackName="test_stack",
+        TemplateBody=template_json,
+        Parameters=[
+            {"ParameterKey": key, "ParameterValue": value}
+            for key, value in [
+                ("DBInstanceIdentifier", "master_db"),
+                ("DBName", "my_db"),
+                ("DBUser", "my_user"),
+                ("DBPassword", "my_password"),
+                ("DBAllocatedStorage", "20"),
+                ("DBInstanceClass", "db.m1.medium"),
+                ("MultiAZ", "true"),
+            ]
         ],
     )
 
-    rds_conn = boto.rds.connect_to_region("eu-central-1")
-    primary = rds_conn.get_all_dbinstances("master_db")[0]
+    rds_conn = boto3.client("rds", region_name="eu-central-1")
+    primary = rds_conn.describe_db_instances(DBInstanceIdentifier="master_db")[
+        "DBInstances"
+    ][0]
 
-    subnet_group_name = primary.subnet_group.name
-    subnet_group = rds_conn.get_all_db_subnet_groups(subnet_group_name)[0]
-    subnet_group.description.should.equal("my db subnet group")
+    subnet_group_name = primary["DBSubnetGroup"]["DBSubnetGroupName"]
+    subnet_group = rds_conn.describe_db_subnet_groups(
+        DBSubnetGroupName=subnet_group_name
+    )["DBSubnetGroups"][0]
+    subnet_group["DBSubnetGroupDescription"].should.equal("my db subnet group")
 
 
-@mock_autoscaling_deprecated()
-@mock_iam_deprecated()
-@mock_cloudformation_deprecated()
+@mock_autoscaling
+@mock_iam
+@mock_cloudformation
 def test_iam_roles():
     iam_template = {
         "AWSTemplateFormatVersion": "2010-09-09",
@@ -928,94 +952,99 @@ def test_iam_roles():
     }
 
     iam_template_json = json.dumps(iam_template)
-    conn = boto.cloudformation.connect_to_region("us-west-1")
-    conn.create_stack("test_stack", template_body=iam_template_json)
+    conn = boto3.client("cloudformation", "us-west-1")
+    conn.create_stack(StackName="test_stack", TemplateBody=iam_template_json)
 
-    iam_conn = boto.iam.connect_to_region("us-west-1")
-
-    role_results = iam_conn.list_roles()["list_roles_response"]["list_roles_result"][
-        "roles"
-    ]
+    iam_conn = boto3.client("iam", region_name="us-west-1")
+    role_results = iam_conn.list_roles()["Roles"]
     role_name_to_id = {}
     for role_result in role_results:
-        role = iam_conn.get_role(role_result.role_name)
-        if "my-role" not in role.role_name:
-            role_name_to_id["with-path"] = role.role_id
-            role.path.should.equal("my-path")
-            len(role.role_name).should.equal(
+        role = iam_conn.get_role(RoleName=role_result["RoleName"])["Role"]
+        if "my-role" not in role["RoleName"]:
+            role_name_to_id["with-path"] = role["RoleId"]
+            role["Path"].should.equal("my-path")
+            len(role["RoleName"]).should.equal(
                 5
             )  # Role name is not specified, so randomly generated - can't check exact name
         else:
-            role_name_to_id["no-path"] = role.role_id
-            role.role_name.should.equal("my-role-no-path-name")
-            role.path.should.equal("/")
+            role_name_to_id["no-path"] = role["RoleId"]
+            role["RoleName"].should.equal("my-role-no-path-name")
+            role["Path"].should.equal("/")
 
-    instance_profile_responses = iam_conn.list_instance_profiles()[
-        "list_instance_profiles_response"
-    ]["list_instance_profiles_result"]["instance_profiles"]
+    instance_profile_responses = iam_conn.list_instance_profiles()["InstanceProfiles"]
     instance_profile_responses.should.have.length_of(2)
     instance_profile_names = []
 
     for instance_profile_response in instance_profile_responses:
         instance_profile = iam_conn.get_instance_profile(
-            instance_profile_response.instance_profile_name
-        )
-        instance_profile_names.append(instance_profile.instance_profile_name)
-        instance_profile.instance_profile_name.should.contain("my-instance-profile")
-        if "with-path" in instance_profile.instance_profile_name:
-            instance_profile.path.should.equal("my-path")
-            instance_profile.role_id.should.equal(role_name_to_id["with-path"])
+            InstanceProfileName=instance_profile_response["InstanceProfileName"]
+        )["InstanceProfile"]
+        instance_profile_names.append(instance_profile["InstanceProfileName"])
+        instance_profile["InstanceProfileName"].should.contain("my-instance-profile")
+        if "with-path" in instance_profile["InstanceProfileName"]:
+            instance_profile["Path"].should.equal("my-path")
+            instance_profile["Roles"][0]["RoleId"].should.equal(
+                role_name_to_id["with-path"]
+            )
         else:
-            instance_profile.instance_profile_name.should.contain("no-path")
-            instance_profile.role_id.should.equal(role_name_to_id["no-path"])
-            instance_profile.path.should.equal("/")
+            instance_profile["InstanceProfileName"].should.contain("no-path")
+            instance_profile["Roles"][0]["RoleId"].should.equal(
+                role_name_to_id["no-path"]
+            )
+            instance_profile["Path"].should.equal("/")
 
-    autoscale_conn = boto.ec2.autoscale.connect_to_region("us-west-1")
-    launch_config = autoscale_conn.get_all_launch_configurations()[0]
-    launch_config.instance_profile_name.should.contain("my-instance-profile-with-path")
+    autoscale_conn = boto3.client("autoscaling", region_name="us-west-1")
+    launch_config = autoscale_conn.describe_launch_configurations()[
+        "LaunchConfigurations"
+    ][0]
+    launch_config["IamInstanceProfile"].should.contain("my-instance-profile-with-path")
 
-    stack = conn.describe_stacks()[0]
-    resources = stack.describe_resources()
+    resources = conn.list_stack_resources(StackName="test_stack")[
+        "StackResourceSummaries"
+    ]
     instance_profile_resources = [
         resource
         for resource in resources
-        if resource.resource_type == "AWS::IAM::InstanceProfile"
+        if resource["ResourceType"] == "AWS::IAM::InstanceProfile"
     ]
-    {ip.physical_resource_id for ip in instance_profile_resources}.should.equal(
+    {ip["PhysicalResourceId"] for ip in instance_profile_resources}.should.equal(
         set(instance_profile_names)
     )
 
     role_resources = [
-        resource for resource in resources if resource.resource_type == "AWS::IAM::Role"
+        resource
+        for resource in resources
+        if resource["ResourceType"] == "AWS::IAM::Role"
     ]
-    {r.physical_resource_id for r in role_resources}.should.equal(
+    {r["PhysicalResourceId"] for r in role_resources}.should.equal(
         set(role_name_to_id.values())
     )
 
 
-@mock_ec2_deprecated()
-@mock_cloudformation_deprecated()
+@mock_ec2
+@mock_cloudformation
 def test_single_instance_with_ebs_volume():
     template_json = json.dumps(single_instance_with_ebs_volume.template)
-    conn = boto.cloudformation.connect_to_region("us-west-1")
+    conn = boto3.client("cloudformation", region_name="us-west-1")
+    cloudformation = boto3.resource("cloudformation", region_name="us-west-1")
     conn.create_stack(
-        "test_stack", template_body=template_json, parameters=[("KeyName", "key_name")]
+        StackName="test_stack",
+        TemplateBody=template_json,
+        Parameters=[{"ParameterKey": "KeyName", "ParameterValue": "key_name"}],
     )
 
-    ec2_conn = boto.ec2.connect_to_region("us-west-1")
-    reservation = ec2_conn.get_all_instances()[0]
-    ec2_instance = reservation.instances[0]
+    ec2 = boto3.resource("ec2", region_name="us-west-1")
+    ec2_conn = boto3.client("ec2", region_name="us-west-1")
+    reservation = ec2_conn.describe_instances()["Reservations"][0]
+    instance = reservation["Instances"][0]
+    volume_id = instance["BlockDeviceMappings"][0]["Ebs"]["VolumeId"]
+    volume = ec2.Volume(volume_id)
 
-    volumes = ec2_conn.get_all_volumes()
-    # Grab the mounted drive
-    volume = [volume for volume in volumes if volume.attach_data.device == "/dev/sdh"][
-        0
-    ]
-    volume.volume_state().should.equal("in-use")
-    volume.attach_data.instance_id.should.equal(ec2_instance.id)
+    volume.state.should.equal("in-use")
+    volume.attachments[0]["InstanceId"].should.equal(instance["InstanceId"])
 
-    stack = conn.describe_stacks()[0]
-    resources = stack.describe_resources()
+    stack = cloudformation.Stack("test_stack")
+    resources = stack.resource_summaries.all()
     ebs_volumes = [
         resource
         for resource in resources
@@ -1024,65 +1053,68 @@ def test_single_instance_with_ebs_volume():
     ebs_volumes[0].physical_resource_id.should.equal(volume.id)
 
 
-@mock_cloudformation_deprecated()
+@mock_cloudformation
 def test_create_template_without_required_param():
     template_json = json.dumps(single_instance_with_ebs_volume.template)
-    conn = boto.cloudformation.connect_to_region("us-west-1")
+    conn = boto3.client("cloudformation", region_name="us-west-1")
     conn.create_stack.when.called_with(
-        "test_stack", template_body=template_json
-    ).should.throw(BotoServerError)
+        StackName="test_stack", TemplateBody=template_json
+    ).should.throw(ClientError)
 
 
-@mock_ec2_deprecated()
-@mock_cloudformation_deprecated()
+@mock_ec2
+@mock_cloudformation
 def test_classic_eip():
     template_json = json.dumps(ec2_classic_eip.template)
-    conn = boto.cloudformation.connect_to_region("us-west-1")
-    conn.create_stack("test_stack", template_body=template_json)
-    ec2_conn = boto.ec2.connect_to_region("us-west-1")
-    eip = ec2_conn.get_all_addresses()[0]
+    cloudformation = boto3.resource("cloudformation", region_name="us-west-1")
+    conn = boto3.client("cloudformation", region_name="us-west-1")
+    conn.create_stack(StackName="test_stack", TemplateBody=template_json)
+    ec2_conn = boto3.client("ec2", region_name="us-west-1")
+    eip = ec2_conn.describe_addresses()["Addresses"][0]
 
-    stack = conn.describe_stacks()[0]
-    resources = stack.describe_resources()
+    stack = cloudformation.Stack("test_stack")
+    resources = stack.resource_summaries.all()
     cfn_eip = [
         resource for resource in resources if resource.resource_type == "AWS::EC2::EIP"
     ][0]
-    cfn_eip.physical_resource_id.should.equal(eip.public_ip)
+    cfn_eip.physical_resource_id.should.equal(eip["PublicIp"])
 
 
-@mock_ec2_deprecated()
-@mock_cloudformation_deprecated()
+@mock_ec2
+@mock_cloudformation
 def test_vpc_eip():
     template_json = json.dumps(vpc_eip.template)
-    conn = boto.cloudformation.connect_to_region("us-west-1")
-    conn.create_stack("test_stack", template_body=template_json)
-    ec2_conn = boto.ec2.connect_to_region("us-west-1")
-    eip = ec2_conn.get_all_addresses()[0]
+    cloudformation = boto3.resource("cloudformation", region_name="us-west-1")
+    conn = boto3.client("cloudformation", region_name="us-west-1")
+    conn.create_stack(StackName="test_stack", TemplateBody=template_json)
+    ec2_conn = boto3.client("ec2", region_name="us-west-1")
+    eip = ec2_conn.describe_addresses()["Addresses"][0]
 
-    stack = conn.describe_stacks()[0]
-    resources = stack.describe_resources()
+    stack = cloudformation.Stack("test_stack")
+    resources = stack.resource_summaries.all()
     cfn_eip = [
         resource for resource in resources if resource.resource_type == "AWS::EC2::EIP"
     ][0]
-    cfn_eip.physical_resource_id.should.equal(eip.public_ip)
+    cfn_eip.physical_resource_id.should.equal(eip["PublicIp"])
 
 
-@mock_ec2_deprecated()
-@mock_cloudformation_deprecated()
+@mock_ec2
+@mock_cloudformation
 def test_fn_join():
     template_json = json.dumps(fn_join.template)
-    conn = boto.cloudformation.connect_to_region("us-west-1")
-    conn.create_stack("test_stack", template_body=template_json)
-    ec2_conn = boto.ec2.connect_to_region("us-west-1")
-    eip = ec2_conn.get_all_addresses()[0]
+    cloudformation = boto3.resource("cloudformation", region_name="us-west-1")
+    conn = boto3.client("cloudformation", region_name="us-west-1")
+    conn.create_stack(StackName="test_stack", TemplateBody=template_json)
+    ec2_conn = boto3.client("ec2", region_name="us-west-1")
+    eip = ec2_conn.describe_addresses()["Addresses"][0]
 
-    stack = conn.describe_stacks()[0]
+    stack = cloudformation.Stack("test_stack")
     fn_join_output = stack.outputs[0]
-    fn_join_output.value.should.equal("test eip:{0}".format(eip.public_ip))
+    fn_join_output["OutputValue"].should.equal("test eip:{0}".format(eip["PublicIp"]))
 
 
-@mock_cloudformation_deprecated()
-@mock_sqs_deprecated()
+@mock_cloudformation
+@mock_sqs
 def test_conditional_resources():
     sqs_template = {
         "AWSTemplateFormatVersion": "2010-09-09",
@@ -1100,27 +1132,25 @@ def test_conditional_resources():
     }
     sqs_template_json = json.dumps(sqs_template)
 
-    conn = boto.cloudformation.connect_to_region("us-west-1")
+    conn = boto3.client("cloudformation", region_name="us-west-1")
     conn.create_stack(
-        "test_stack_without_queue",
-        template_body=sqs_template_json,
-        parameters=[("EnvType", "staging")],
+        StackName="test_stack_without_queue",
+        TemplateBody=sqs_template_json,
+        Parameters=[{"ParameterKey": "EnvType", "ParameterValue": "staging"}],
     )
-    sqs_conn = boto.sqs.connect_to_region("us-west-1")
-    list(sqs_conn.get_all_queues()).should.have.length_of(0)
+    sqs_conn = boto3.client("sqs", region_name="us-west-1")
+    list(sqs_conn.list_queues().get("QueueUrls", [])).should.have.length_of(0)
 
-    conn = boto.cloudformation.connect_to_region("us-west-1")
     conn.create_stack(
-        "test_stack_with_queue",
-        template_body=sqs_template_json,
-        parameters=[("EnvType", "prod")],
+        StackName="test_stack_with_queue",
+        TemplateBody=sqs_template_json,
+        Parameters=[{"ParameterKey": "EnvType", "ParameterValue": "prod"}],
     )
-    sqs_conn = boto.sqs.connect_to_region("us-west-1")
-    list(sqs_conn.get_all_queues()).should.have.length_of(1)
+    list(sqs_conn.list_queues()["QueueUrls"]).should.have.length_of(1)
 
 
-@mock_cloudformation_deprecated()
-@mock_ec2_deprecated()
+@mock_cloudformation
+@mock_ec2
 def test_conditional_if_handling():
     dummy_template = {
         "AWSTemplateFormatVersion": "2010-09-09",
@@ -1146,26 +1176,35 @@ def test_conditional_if_handling():
     }
     dummy_template_json = json.dumps(dummy_template)
 
-    conn = boto.cloudformation.connect_to_region("us-west-1")
-    conn.create_stack("test_stack1", template_body=dummy_template_json)
-    ec2_conn = boto.ec2.connect_to_region("us-west-1")
-    reservation = ec2_conn.get_all_instances()[0]
-    ec2_instance = reservation.instances[0]
+    conn = boto3.client("cloudformation", region_name="us-west-1")
+    conn.create_stack(StackName="test_stack1", TemplateBody=dummy_template_json)
+    ec2_conn = boto3.client("ec2", region_name="us-west-1")
+    ec2 = boto3.resource("ec2", region_name="us-west-1")
+
+    reservation = ec2_conn.describe_instances()["Reservations"][0]
+    instance_id = reservation["Instances"][0]["InstanceId"]
+    ec2_instance = ec2.Instance(instance_id)
+
     ec2_instance.image_id.should.equal("ami-ffffffff")
     ec2_instance.terminate()
 
-    conn = boto.cloudformation.connect_to_region("us-west-2")
+    conn = boto3.client("cloudformation", region_name="us-west-2")
     conn.create_stack(
-        "test_stack1", template_body=dummy_template_json, parameters=[("ENV", "prd")]
+        StackName="test_stack1",
+        TemplateBody=dummy_template_json,
+        Parameters=[{"ParameterKey": "ENV", "ParameterValue": "prd"}],
     )
-    ec2_conn = boto.ec2.connect_to_region("us-west-2")
-    reservation = ec2_conn.get_all_instances()[0]
-    ec2_instance = reservation.instances[0]
+
+    ec2_conn = boto3.client("ec2", region_name="us-west-2")
+    ec2 = boto3.resource("ec2", region_name="us-west-2")
+    reservation = ec2_conn.describe_instances()["Reservations"][0]
+    instance_id = reservation["Instances"][0]["InstanceId"]
+    ec2_instance = ec2.Instance(instance_id)
     ec2_instance.image_id.should.equal("ami-00000000")
 
 
-@mock_cloudformation_deprecated()
-@mock_ec2_deprecated()
+@mock_cloudformation
+@mock_ec2
 def test_cloudformation_mapping():
     dummy_template = {
         "AWSTemplateFormatVersion": "2010-09-09",
@@ -1194,180 +1233,184 @@ def test_cloudformation_mapping():
 
     dummy_template_json = json.dumps(dummy_template)
 
-    conn = boto.cloudformation.connect_to_region("us-east-1")
-    conn.create_stack("test_stack1", template_body=dummy_template_json)
-    ec2_conn = boto.ec2.connect_to_region("us-east-1")
-    reservation = ec2_conn.get_all_instances()[0]
-    ec2_instance = reservation.instances[0]
+    conn = boto3.client("cloudformation", region_name="us-east-1")
+    conn.create_stack(StackName="test_stack1", TemplateBody=dummy_template_json)
+    ec2_conn = boto3.client("ec2", region_name="us-east-1")
+    ec2 = boto3.resource("ec2", region_name="us-east-1")
+    reservation = ec2_conn.describe_instances()["Reservations"][0]
+    instance_id = reservation["Instances"][0]["InstanceId"]
+    ec2_instance = ec2.Instance(instance_id)
     ec2_instance.image_id.should.equal("ami-6411e20d")
 
-    conn = boto.cloudformation.connect_to_region("us-west-1")
-    conn.create_stack("test_stack1", template_body=dummy_template_json)
-    ec2_conn = boto.ec2.connect_to_region("us-west-1")
-    reservation = ec2_conn.get_all_instances()[0]
-    ec2_instance = reservation.instances[0]
+    conn = boto3.client("cloudformation", region_name="us-west-1")
+    conn.create_stack(StackName="test_stack1", TemplateBody=dummy_template_json)
+    ec2_conn = boto3.client("ec2", region_name="us-west-1")
+    ec2 = boto3.resource("ec2", region_name="us-west-1")
+    reservation = ec2_conn.describe_instances()["Reservations"][0]
+    instance_id = reservation["Instances"][0]["InstanceId"]
+    ec2_instance = ec2.Instance(instance_id)
     ec2_instance.image_id.should.equal("ami-c9c7978c")
 
 
-@mock_cloudformation_deprecated()
-@mock_route53_deprecated()
+@mock_cloudformation
+@mock_route53
 def test_route53_roundrobin():
-    route53_conn = boto.connect_route53()
+    route53_conn = boto3.client("route53", region_name="us-west-1")
 
     template_json = json.dumps(route53_roundrobin.template)
-    conn = boto.cloudformation.connect_to_region("us-west-1")
-    stack = conn.create_stack("test_stack", template_body=template_json)
+    conn = boto3.client("cloudformation", region_name="us-west-1")
+    cloudformation = boto3.resource("cloudformation", region_name="us-west-1")
+    stack = conn.create_stack(StackName="test_stack", TemplateBody=template_json)
 
-    zones = route53_conn.get_all_hosted_zones()["ListHostedZonesResponse"][
-        "HostedZones"
-    ]
+    zones = route53_conn.list_hosted_zones()["HostedZones"]
     list(zones).should.have.length_of(1)
     zone_id = zones[0]["Id"]
     zone_id = zone_id.split("/")
     zone_id = zone_id[2]
 
-    rrsets = route53_conn.get_all_rrsets(zone_id)
-    rrsets.hosted_zone_id.should.equal(zone_id)
+    rrsets = route53_conn.list_resource_record_sets(HostedZoneId=zone_id)[
+        "ResourceRecordSets"
+    ]
     rrsets.should.have.length_of(2)
     record_set1 = rrsets[0]
-    record_set1.name.should.equal("test_stack.us-west-1.my_zone.")
-    record_set1.identifier.should.equal("test_stack AWS")
-    record_set1.type.should.equal("CNAME")
-    record_set1.ttl.should.equal("900")
-    record_set1.weight.should.equal("3")
-    record_set1.resource_records[0].should.equal("aws.amazon.com")
+    record_set1["Name"].should.equal("test_stack.us-west-1.my_zone.")
+    record_set1["SetIdentifier"].should.equal("test_stack AWS")
+    record_set1["Type"].should.equal("CNAME")
+    record_set1["TTL"].should.equal(900)
+    record_set1["Weight"].should.equal(3)
+    record_set1["ResourceRecords"][0]["Value"].should.equal("aws.amazon.com")
 
     record_set2 = rrsets[1]
-    record_set2.name.should.equal("test_stack.us-west-1.my_zone.")
-    record_set2.identifier.should.equal("test_stack Amazon")
-    record_set2.type.should.equal("CNAME")
-    record_set2.ttl.should.equal("900")
-    record_set2.weight.should.equal("1")
-    record_set2.resource_records[0].should.equal("www.amazon.com")
+    record_set2["Name"].should.equal("test_stack.us-west-1.my_zone.")
+    record_set2["SetIdentifier"].should.equal("test_stack Amazon")
+    record_set2["Type"].should.equal("CNAME")
+    record_set2["TTL"].should.equal(900)
+    record_set2["Weight"].should.equal(1)
+    record_set2["ResourceRecords"][0]["Value"].should.equal("www.amazon.com")
 
-    stack = conn.describe_stacks()[0]
-    output = stack.outputs[0]
-    output.key.should.equal("DomainName")
-    output.value.should.equal("arn:aws:route53:::hostedzone/{0}".format(zone_id))
+    stack = cloudformation.Stack("test_stack")
+    fn_join_output = stack.outputs[0]
+    fn_join_output["OutputKey"].should.equal("DomainName")
+    fn_join_output["OutputValue"].should.equal(
+        "arn:aws:route53:::hostedzone/{0}".format(zone_id)
+    )
 
 
-@mock_cloudformation_deprecated()
-@mock_ec2_deprecated()
-@mock_route53_deprecated()
+@mock_cloudformation
+@mock_ec2
+@mock_route53
 def test_route53_ec2_instance_with_public_ip():
-    route53_conn = boto.connect_route53()
-    ec2_conn = boto.ec2.connect_to_region("us-west-1")
+    route53_conn = boto3.client("route53", region_name="us-west-1")
+    ec2_conn = boto3.client("ec2", region_name="us-west-1")
 
     template_json = json.dumps(route53_ec2_instance_with_public_ip.template)
-    conn = boto.cloudformation.connect_to_region("us-west-1")
-    conn.create_stack("test_stack", template_body=template_json)
+    conn = boto3.client("cloudformation", region_name="us-west-1")
+    conn.create_stack(StackName="test_stack", TemplateBody=template_json)
+    reservation = ec2_conn.describe_instances()["Reservations"][0]
+    instance_id = reservation["Instances"][0]["InstanceId"]
 
-    instance_id = ec2_conn.get_all_reservations()[0].instances[0].id
-
-    zones = route53_conn.get_all_hosted_zones()["ListHostedZonesResponse"][
-        "HostedZones"
-    ]
+    zones = route53_conn.list_hosted_zones()["HostedZones"]
     list(zones).should.have.length_of(1)
     zone_id = zones[0]["Id"]
     zone_id = zone_id.split("/")
     zone_id = zone_id[2]
 
-    rrsets = route53_conn.get_all_rrsets(zone_id)
+    rrsets = route53_conn.list_resource_record_sets(HostedZoneId=zone_id)[
+        "ResourceRecordSets"
+    ]
     rrsets.should.have.length_of(1)
 
     record_set1 = rrsets[0]
-    record_set1.name.should.equal("{0}.us-west-1.my_zone.".format(instance_id))
-    record_set1.identifier.should.equal(None)
-    record_set1.type.should.equal("A")
-    record_set1.ttl.should.equal("900")
-    record_set1.weight.should.equal(None)
-    record_set1.resource_records[0].should.equal("10.0.0.25")
+    record_set1["Name"].should.equal("{0}.us-west-1.my_zone.".format(instance_id))
+    record_set1.get("SetIdentifier").should.equal(None)
+    record_set1["Type"].should.equal("A")
+    record_set1["TTL"].should.equal(900)
+    record_set1.get("Weight").should.equal(None)
+    record_set1["ResourceRecords"][0]["Value"].should.equal("10.0.0.25")
 
 
-@mock_cloudformation_deprecated()
-@mock_route53_deprecated()
+@mock_cloudformation
+@mock_route53
 def test_route53_associate_health_check():
-    route53_conn = boto.connect_route53()
+    route53_conn = boto3.client("route53", region_name="us-west-1")
 
     template_json = json.dumps(route53_health_check.template)
-    conn = boto.cloudformation.connect_to_region("us-west-1")
-    conn.create_stack("test_stack", template_body=template_json)
+    conn = boto3.client("cloudformation", region_name="us-west-1")
+    conn.create_stack(StackName="test_stack", TemplateBody=template_json)
 
-    checks = route53_conn.get_list_health_checks()["ListHealthChecksResponse"][
-        "HealthChecks"
-    ]
+    checks = route53_conn.list_health_checks()["HealthChecks"]
     list(checks).should.have.length_of(1)
     check = checks[0]
     health_check_id = check["Id"]
     config = check["HealthCheckConfig"]
-    config["FailureThreshold"].should.equal("3")
+    config["FailureThreshold"].should.equal(3)
     config["IPAddress"].should.equal("10.0.0.4")
-    config["Port"].should.equal("80")
-    config["RequestInterval"].should.equal("10")
+    config["Port"].should.equal(80)
+    config["RequestInterval"].should.equal(10)
     config["ResourcePath"].should.equal("/")
     config["Type"].should.equal("HTTP")
 
-    zones = route53_conn.get_all_hosted_zones()["ListHostedZonesResponse"][
-        "HostedZones"
-    ]
+    zones = route53_conn.list_hosted_zones()["HostedZones"]
     list(zones).should.have.length_of(1)
     zone_id = zones[0]["Id"]
     zone_id = zone_id.split("/")
     zone_id = zone_id[2]
 
-    rrsets = route53_conn.get_all_rrsets(zone_id)
+    rrsets = route53_conn.list_resource_record_sets(HostedZoneId=zone_id)[
+        "ResourceRecordSets"
+    ]
     rrsets.should.have.length_of(1)
 
     record_set = rrsets[0]
-    record_set.health_check.should.equal(health_check_id)
+    record_set["HealthCheckId"].should.equal(health_check_id)
 
 
-@mock_cloudformation_deprecated()
-@mock_route53_deprecated()
+@mock_cloudformation
+@mock_route53
 def test_route53_with_update():
-    route53_conn = boto.connect_route53()
+    route53_conn = boto3.client("route53", region_name="us-west-1")
 
     template_json = json.dumps(route53_health_check.template)
-    cf_conn = boto.cloudformation.connect_to_region("us-west-1")
-    cf_conn.create_stack("test_stack", template_body=template_json)
+    cf_conn = boto3.client("cloudformation", region_name="us-west-1")
+    cf_conn.create_stack(StackName="test_stack", TemplateBody=template_json)
 
-    zones = route53_conn.get_all_hosted_zones()["ListHostedZonesResponse"][
-        "HostedZones"
-    ]
+    zones = route53_conn.list_hosted_zones()["HostedZones"]
     list(zones).should.have.length_of(1)
     zone_id = zones[0]["Id"]
     zone_id = zone_id.split("/")
     zone_id = zone_id[2]
 
-    rrsets = route53_conn.get_all_rrsets(zone_id)
+    rrsets = route53_conn.list_resource_record_sets(HostedZoneId=zone_id)[
+        "ResourceRecordSets"
+    ]
     rrsets.should.have.length_of(1)
 
     record_set = rrsets[0]
-    record_set.resource_records.should.equal(["my.example.com"])
+    record_set["ResourceRecords"][0]["Value"].should.equal("my.example.com")
 
     route53_health_check.template["Resources"]["myDNSRecord"]["Properties"][
         "ResourceRecords"
     ] = ["my_other.example.com"]
     template_json = json.dumps(route53_health_check.template)
-    cf_conn.update_stack("test_stack", template_body=template_json)
+    cf_conn.update_stack(StackName="test_stack", TemplateBody=template_json)
 
-    zones = route53_conn.get_all_hosted_zones()["ListHostedZonesResponse"][
-        "HostedZones"
-    ]
+    zones = route53_conn.list_hosted_zones()["HostedZones"]
     list(zones).should.have.length_of(1)
     zone_id = zones[0]["Id"]
     zone_id = zone_id.split("/")
     zone_id = zone_id[2]
 
-    rrsets = route53_conn.get_all_rrsets(zone_id)
+    rrsets = route53_conn.list_resource_record_sets(HostedZoneId=zone_id)[
+        "ResourceRecordSets"
+    ]
     rrsets.should.have.length_of(1)
 
     record_set = rrsets[0]
-    record_set.resource_records.should.equal(["my_other.example.com"])
+    record_set["ResourceRecords"][0]["Value"].should.equal("my_other.example.com")
 
 
-@mock_cloudformation_deprecated()
-@mock_sns_deprecated()
+@mock_cloudformation
+@mock_sns
 def test_sns_topic():
     dummy_template = {
         "AWSTemplateFormatVersion": "2010-09-09",
@@ -1388,20 +1431,17 @@ def test_sns_topic():
         },
     }
     template_json = json.dumps(dummy_template)
-    conn = boto.cloudformation.connect_to_region("us-west-1")
-    stack = conn.create_stack("test_stack", template_body=template_json)
+    conn = boto3.client("cloudformation", region_name="us-west-1")
+    cloudformation = boto3.resource("cloudformation", region_name="us-west-1")
+    stack = conn.create_stack(StackName="test_stack", TemplateBody=template_json)
 
-    sns_conn = boto.sns.connect_to_region("us-west-1")
-    topics = sns_conn.get_all_topics()["ListTopicsResponse"]["ListTopicsResult"][
-        "Topics"
-    ]
+    sns_conn = boto3.client("sns", region_name="us-west-1")
+    topics = sns_conn.list_topics()["Topics"]
     topics.should.have.length_of(1)
     topic_arn = topics[0]["TopicArn"]
     topic_arn.should.contain("my_topics")
 
-    subscriptions = sns_conn.get_all_subscriptions()["ListSubscriptionsResponse"][
-        "ListSubscriptionsResult"
-    ]["Subscriptions"]
+    subscriptions = sns_conn.list_subscriptions()["Subscriptions"]
     subscriptions.should.have.length_of(1)
     subscription = subscriptions[0]
     subscription["TopicArn"].should.equal(topic_arn)
@@ -1409,15 +1449,14 @@ def test_sns_topic():
     subscription["SubscriptionArn"].should.contain(topic_arn)
     subscription["Endpoint"].should.equal("https://example.com")
 
-    stack = conn.describe_stacks()[0]
-    topic_name_output = [x for x in stack.outputs if x.key == "topic_name"][0]
-    topic_name_output.value.should.equal("my_topics")
-    topic_arn_output = [x for x in stack.outputs if x.key == "topic_arn"][0]
-    topic_arn_output.value.should.equal(topic_arn)
+    stack = cloudformation.Stack("test_stack")
+    outputs = {output["OutputKey"]: output["OutputValue"] for output in stack.outputs}
+    outputs["topic_name"].should.equal("my_topics")
+    outputs["topic_arn"].should.equal(topic_arn)
 
 
-@mock_cloudformation_deprecated
-@mock_ec2_deprecated
+@mock_cloudformation
+@mock_ec2
 def test_vpc_gateway_attachment_creation_should_attach_itself_to_vpc():
     template = {
         "AWSTemplateFormatVersion": "2010-09-09",
@@ -1443,42 +1482,51 @@ def test_vpc_gateway_attachment_creation_should_attach_itself_to_vpc():
     }
 
     template_json = json.dumps(template)
-    cf_conn = boto.cloudformation.connect_to_region("us-west-1")
-    cf_conn.create_stack("test_stack", template_body=template_json)
+    cf_conn = boto3.client("cloudformation", region_name="us-west-1")
+    cf_conn.create_stack(StackName="test_stack", TemplateBody=template_json)
 
-    vpc_conn = boto.vpc.connect_to_region("us-west-1")
-    vpc = vpc_conn.get_all_vpcs(filters={"cidrBlock": "10.0.0.0/16"})[0]
-    igws = vpc_conn.get_all_internet_gateways(filters={"attachment.vpc-id": vpc.id})
+    vpc_conn = boto3.client("ec2", region_name="us-west-1")
+    vpc = vpc_conn.describe_vpcs(
+        Filters=[{"Name": "cidrBlock", "Values": ["10.0.0.0/16"]}]
+    )["Vpcs"][0]
+    igws = vpc_conn.describe_internet_gateways(
+        Filters=[{"Name": "attachment.vpc-id", "Values": [vpc["VpcId"]]}]
+    )["InternetGateways"]
 
     igws.should.have.length_of(1)
 
 
-@mock_cloudformation_deprecated
-@mock_ec2_deprecated
+@mock_cloudformation
+@mock_ec2
 def test_vpc_peering_creation():
-    vpc_conn = boto.vpc.connect_to_region("us-west-1")
-    vpc_source = vpc_conn.create_vpc("10.0.0.0/16")
-    peer_vpc = vpc_conn.create_vpc("10.1.0.0/16")
+    vpc_conn = boto3.client("ec2", region_name="us-west-1")
+    vpc_source = vpc_conn.create_vpc(CidrBlock="10.0.0.0/16")["Vpc"]
+    peer_vpc = vpc_conn.create_vpc(CidrBlock="10.1.0.0/16")["Vpc"]
     template = {
         "AWSTemplateFormatVersion": "2010-09-09",
         "Resources": {
             "vpcpeeringconnection": {
                 "Type": "AWS::EC2::VPCPeeringConnection",
-                "Properties": {"PeerVpcId": peer_vpc.id, "VpcId": vpc_source.id},
+                "Properties": {
+                    "PeerVpcId": peer_vpc["VpcId"],
+                    "VpcId": vpc_source["VpcId"],
+                },
             }
         },
     }
 
     template_json = json.dumps(template)
-    cf_conn = boto.cloudformation.connect_to_region("us-west-1")
-    cf_conn.create_stack("test_stack", template_body=template_json)
+    cf_conn = boto3.client("cloudformation", region_name="us-west-1")
+    cf_conn.create_stack(StackName="test_stack", TemplateBody=template_json)
 
-    peering_connections = vpc_conn.get_all_vpc_peering_connections()
+    peering_connections = vpc_conn.describe_vpc_peering_connections()[
+        "VpcPeeringConnections"
+    ]
     peering_connections.should.have.length_of(1)
 
 
-@mock_cloudformation_deprecated
-@mock_ec2_deprecated
+@mock_cloudformation
+@mock_ec2
 def test_multiple_security_group_ingress_separate_from_security_group_by_id():
     template = {
         "AWSTemplateFormatVersion": "2010-09-09",
@@ -1511,30 +1559,34 @@ def test_multiple_security_group_ingress_separate_from_security_group_by_id():
     }
 
     template_json = json.dumps(template)
-    cf_conn = boto.cloudformation.connect_to_region("us-west-1")
-    cf_conn.create_stack("test_stack", template_body=template_json)
-    ec2_conn = boto.ec2.connect_to_region("us-west-1")
+    cf_conn = boto3.client("cloudformation", region_name="us-west-1")
+    cf_conn.create_stack(StackName="test_stack", TemplateBody=template_json)
+    ec2_conn = boto3.client("ec2", region_name="us-west-1")
 
-    security_group1 = ec2_conn.get_all_security_groups(filters={"tag:sg-name": "sg1"})[
-        0
-    ]
-    security_group2 = ec2_conn.get_all_security_groups(filters={"tag:sg-name": "sg2"})[
-        0
-    ]
+    security_group1 = ec2_conn.describe_security_groups(
+        Filters=[{"Name": "tag:sg-name", "Values": ["sg1"]}]
+    )["SecurityGroups"][0]
+    security_group2 = ec2_conn.describe_security_groups(
+        Filters=[{"Name": "tag:sg-name", "Values": ["sg2"]}]
+    )["SecurityGroups"][0]
 
-    security_group1.rules.should.have.length_of(1)
-    security_group1.rules[0].grants.should.have.length_of(1)
-    security_group1.rules[0].grants[0].group_id.should.equal(security_group2.id)
-    security_group1.rules[0].ip_protocol.should.equal("tcp")
-    security_group1.rules[0].from_port.should.equal("80")
-    security_group1.rules[0].to_port.should.equal("8080")
+    security_group1["IpPermissions"].should.have.length_of(1)
+    security_group1["IpPermissions"][0]["UserIdGroupPairs"].should.have.length_of(1)
+    security_group1["IpPermissions"][0]["UserIdGroupPairs"][0]["GroupId"].should.equal(
+        security_group2["GroupId"]
+    )
+    security_group1["IpPermissions"][0]["IpProtocol"].should.equal("tcp")
+    security_group1["IpPermissions"][0]["FromPort"].should.equal(80)
+    security_group1["IpPermissions"][0]["ToPort"].should.equal(8080)
 
 
-@mock_cloudformation_deprecated
-@mock_ec2_deprecated
+@mock_cloudformation
+@mock_ec2
 def test_security_group_ingress_separate_from_security_group_by_id():
-    ec2_conn = boto.ec2.connect_to_region("us-west-1")
-    ec2_conn.create_security_group("test-security-group1", "test security group")
+    ec2_conn = boto3.client("ec2", region_name="us-west-1")
+    ec2_conn.create_security_group(
+        GroupName="test-security-group1", Description="test security group"
+    )
 
     template = {
         "AWSTemplateFormatVersion": "2010-09-09",
@@ -1560,28 +1612,30 @@ def test_security_group_ingress_separate_from_security_group_by_id():
     }
 
     template_json = json.dumps(template)
-    cf_conn = boto.cloudformation.connect_to_region("us-west-1")
-    cf_conn.create_stack("test_stack", template_body=template_json)
-    security_group1 = ec2_conn.get_all_security_groups(
-        groupnames=["test-security-group1"]
-    )[0]
-    security_group2 = ec2_conn.get_all_security_groups(filters={"tag:sg-name": "sg2"})[
-        0
-    ]
+    cf_conn = boto3.client("cloudformation", region_name="us-west-1")
+    cf_conn.create_stack(StackName="test_stack", TemplateBody=template_json)
+    security_group1 = ec2_conn.describe_security_groups(
+        Filters=[{"Name": "group-name", "Values": ["test-security-group1"]}]
+    )["SecurityGroups"][0]
+    security_group2 = ec2_conn.describe_security_groups(
+        Filters=[{"Name": "tag:sg-name", "Values": ["sg2"]}]
+    )["SecurityGroups"][0]
 
-    security_group1.rules.should.have.length_of(1)
-    security_group1.rules[0].grants.should.have.length_of(1)
-    security_group1.rules[0].grants[0].group_id.should.equal(security_group2.id)
-    security_group1.rules[0].ip_protocol.should.equal("tcp")
-    security_group1.rules[0].from_port.should.equal("80")
-    security_group1.rules[0].to_port.should.equal("8080")
+    security_group1["IpPermissions"].should.have.length_of(1)
+    security_group1["IpPermissions"][0]["UserIdGroupPairs"].should.have.length_of(1)
+    security_group1["IpPermissions"][0]["UserIdGroupPairs"][0]["GroupId"].should.equal(
+        security_group2["GroupId"]
+    )
+    security_group1["IpPermissions"][0]["IpProtocol"].should.equal("tcp")
+    security_group1["IpPermissions"][0]["FromPort"].should.equal(80)
+    security_group1["IpPermissions"][0]["ToPort"].should.equal(8080)
 
 
-@mock_cloudformation_deprecated
-@mock_ec2_deprecated
+@mock_cloudformation
+@mock_ec2
 def test_security_group_ingress_separate_from_security_group_by_id_using_vpc():
-    vpc_conn = boto.vpc.connect_to_region("us-west-1")
-    vpc = vpc_conn.create_vpc("10.0.0.0/16")
+    ec2_conn = boto3.client("ec2", region_name="us-west-1")
+    vpc = ec2_conn.create_vpc(CidrBlock="10.0.0.0/16")["Vpc"]
 
     template = {
         "AWSTemplateFormatVersion": "2010-09-09",
@@ -1590,7 +1644,7 @@ def test_security_group_ingress_separate_from_security_group_by_id_using_vpc():
                 "Type": "AWS::EC2::SecurityGroup",
                 "Properties": {
                     "GroupDescription": "test security group",
-                    "VpcId": vpc.id,
+                    "VpcId": vpc["VpcId"],
                     "Tags": [{"Key": "sg-name", "Value": "sg1"}],
                 },
             },
@@ -1598,7 +1652,7 @@ def test_security_group_ingress_separate_from_security_group_by_id_using_vpc():
                 "Type": "AWS::EC2::SecurityGroup",
                 "Properties": {
                     "GroupDescription": "test security group",
-                    "VpcId": vpc.id,
+                    "VpcId": vpc["VpcId"],
                     "Tags": [{"Key": "sg-name", "Value": "sg2"}],
                 },
             },
@@ -1606,7 +1660,7 @@ def test_security_group_ingress_separate_from_security_group_by_id_using_vpc():
                 "Type": "AWS::EC2::SecurityGroupIngress",
                 "Properties": {
                     "GroupId": {"Ref": "test-security-group1"},
-                    "VpcId": vpc.id,
+                    "VpcId": vpc["VpcId"],
                     "IpProtocol": "tcp",
                     "FromPort": "80",
                     "ToPort": "8080",
@@ -1617,28 +1671,30 @@ def test_security_group_ingress_separate_from_security_group_by_id_using_vpc():
     }
 
     template_json = json.dumps(template)
-    cf_conn = boto.cloudformation.connect_to_region("us-west-1")
-    cf_conn.create_stack("test_stack", template_body=template_json)
-    security_group1 = vpc_conn.get_all_security_groups(filters={"tag:sg-name": "sg1"})[
-        0
-    ]
-    security_group2 = vpc_conn.get_all_security_groups(filters={"tag:sg-name": "sg2"})[
-        0
-    ]
+    cf_conn = boto3.client("cloudformation", region_name="us-west-1")
+    cf_conn.create_stack(StackName="test_stack", TemplateBody=template_json)
+    security_group1 = ec2_conn.describe_security_groups(
+        Filters=[{"Name": "tag:sg-name", "Values": ["sg1"]}]
+    )["SecurityGroups"][0]
+    security_group2 = ec2_conn.describe_security_groups(
+        Filters=[{"Name": "tag:sg-name", "Values": ["sg2"]}]
+    )["SecurityGroups"][0]
 
-    security_group1.rules.should.have.length_of(1)
-    security_group1.rules[0].grants.should.have.length_of(1)
-    security_group1.rules[0].grants[0].group_id.should.equal(security_group2.id)
-    security_group1.rules[0].ip_protocol.should.equal("tcp")
-    security_group1.rules[0].from_port.should.equal("80")
-    security_group1.rules[0].to_port.should.equal("8080")
+    security_group1["IpPermissions"].should.have.length_of(1)
+    security_group1["IpPermissions"][0]["UserIdGroupPairs"].should.have.length_of(1)
+    security_group1["IpPermissions"][0]["UserIdGroupPairs"][0]["GroupId"].should.equal(
+        security_group2["GroupId"]
+    )
+    security_group1["IpPermissions"][0]["IpProtocol"].should.equal("tcp")
+    security_group1["IpPermissions"][0]["FromPort"].should.equal(80)
+    security_group1["IpPermissions"][0]["ToPort"].should.equal(8080)
 
 
-@mock_cloudformation_deprecated
-@mock_ec2_deprecated
+@mock_cloudformation
+@mock_ec2
 def test_security_group_with_update():
-    vpc_conn = boto.vpc.connect_to_region("us-west-1")
-    vpc1 = vpc_conn.create_vpc("10.0.0.0/16")
+    vpc_conn = boto3.client("ec2", region_name="us-west-1")
+    vpc1 = vpc_conn.create_vpc(CidrBlock="10.0.0.0/16")["Vpc"]
 
     template = {
         "AWSTemplateFormatVersion": "2010-09-09",
@@ -1647,7 +1703,7 @@ def test_security_group_with_update():
                 "Type": "AWS::EC2::SecurityGroup",
                 "Properties": {
                     "GroupDescription": "test security group",
-                    "VpcId": vpc1.id,
+                    "VpcId": vpc1["VpcId"],
                     "Tags": [{"Key": "sg-name", "Value": "sg"}],
                 },
             }
@@ -1655,24 +1711,30 @@ def test_security_group_with_update():
     }
 
     template_json = json.dumps(template)
-    cf_conn = boto.cloudformation.connect_to_region("us-west-1")
-    cf_conn.create_stack("test_stack", template_body=template_json)
-    security_group = vpc_conn.get_all_security_groups(filters={"tag:sg-name": "sg"})[0]
-    security_group.vpc_id.should.equal(vpc1.id)
+    cf_conn = boto3.client("cloudformation", region_name="us-west-1")
+    cf_conn.create_stack(StackName="test_stack", TemplateBody=template_json)
 
-    vpc2 = vpc_conn.create_vpc("10.1.0.0/16")
-    template["Resources"]["test-security-group"]["Properties"]["VpcId"] = vpc2.id
+    security_group = vpc_conn.describe_security_groups(
+        Filters=[{"Name": "tag:sg-name", "Values": ["sg"]}]
+    )["SecurityGroups"][0]
+    security_group["VpcId"].should.equal(vpc1["VpcId"])
+
+    vpc2 = vpc_conn.create_vpc(CidrBlock="10.1.0.0/16")["Vpc"]
+    template["Resources"]["test-security-group"]["Properties"]["VpcId"] = vpc2["VpcId"]
     template_json = json.dumps(template)
-    cf_conn.update_stack("test_stack", template_body=template_json)
-    security_group = vpc_conn.get_all_security_groups(filters={"tag:sg-name": "sg"})[0]
-    security_group.vpc_id.should.equal(vpc2.id)
+    cf_conn.update_stack(StackName="test_stack", TemplateBody=template_json)
+
+    security_group = vpc_conn.describe_security_groups(
+        Filters=[{"Name": "tag:sg-name", "Values": ["sg"]}]
+    )["SecurityGroups"][0]
+    security_group["VpcId"].should.equal(vpc2["VpcId"])
 
 
-@mock_cloudformation_deprecated
-@mock_ec2_deprecated
+@mock_cloudformation
+@mock_ec2
 def test_subnets_should_be_created_with_availability_zone():
-    vpc_conn = boto.vpc.connect_to_region("us-west-1")
-    vpc = vpc_conn.create_vpc("10.0.0.0/16")
+    vpc_conn = boto3.client("ec2", region_name="us-west-1")
+    vpc = vpc_conn.create_vpc(CidrBlock="10.0.0.0/16")["Vpc"]
 
     subnet_template = {
         "AWSTemplateFormatVersion": "2010-09-09",
@@ -1680,22 +1742,24 @@ def test_subnets_should_be_created_with_availability_zone():
             "testSubnet": {
                 "Type": "AWS::EC2::Subnet",
                 "Properties": {
-                    "VpcId": vpc.id,
+                    "VpcId": vpc["VpcId"],
                     "CidrBlock": "10.0.0.0/24",
                     "AvailabilityZone": "us-west-1b",
                 },
             }
         },
     }
-    cf_conn = boto.cloudformation.connect_to_region("us-west-1")
+    cf_conn = boto3.client("cloudformation", region_name="us-west-1")
     template_json = json.dumps(subnet_template)
-    cf_conn.create_stack("test_stack", template_body=template_json)
-    subnet = vpc_conn.get_all_subnets(filters={"cidrBlock": "10.0.0.0/24"})[0]
-    subnet.availability_zone.should.equal("us-west-1b")
+    cf_conn.create_stack(StackName="test_stack", TemplateBody=template_json)
+    subnet = vpc_conn.describe_subnets(
+        Filters=[{"Name": "cidr-block", "Values": ["10.0.0.0/24"]}]
+    )["Subnets"][0]
+    subnet["AvailabilityZone"].should.equal("us-west-1b")
 
 
-@mock_cloudformation_deprecated
-@mock_datapipeline_deprecated
+@mock_cloudformation
+@mock_datapipeline
 def test_datapipeline():
     dp_template = {
         "AWSTemplateFormatVersion": "2010-09-09",
@@ -1741,21 +1805,21 @@ def test_datapipeline():
             }
         },
     }
-    cf_conn = boto.cloudformation.connect_to_region("us-east-1")
+    cf_conn = boto3.client("cloudformation", region_name="us-east-1")
+    cloudformation = boto3.resource("cloudformation", region_name="us-east-1")
     template_json = json.dumps(dp_template)
-    stack_id = cf_conn.create_stack("test_stack", template_body=template_json)
+    stack_id = cf_conn.create_stack(StackName="test_stack", TemplateBody=template_json)
 
-    dp_conn = boto.datapipeline.connect_to_region("us-east-1")
-    data_pipelines = dp_conn.list_pipelines()
+    dp_conn = boto3.client("datapipeline", region_name="us-east-1")
+    data_pipelines = dp_conn.list_pipelines()["pipelineIdList"]
 
-    data_pipelines["pipelineIdList"].should.have.length_of(1)
-    data_pipelines["pipelineIdList"][0]["name"].should.equal("testDataPipeline")
+    data_pipelines.should.have.length_of(1)
+    data_pipelines[0]["name"].should.equal("testDataPipeline")
 
-    stack_resources = cf_conn.list_stack_resources(stack_id)
+    stack = cloudformation.Stack("test_stack")
+    stack_resources = list(stack.resource_summaries.all())
     stack_resources.should.have.length_of(1)
-    stack_resources[0].physical_resource_id.should.equal(
-        data_pipelines["pipelineIdList"][0]["id"]
-    )
+    stack_resources[0].physical_resource_id.should.equal(data_pipelines[0]["id"])
 
 
 @mock_cloudformation

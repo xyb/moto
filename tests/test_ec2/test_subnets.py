@@ -13,7 +13,7 @@ import json
 import sure  # noqa
 import random
 
-from moto import mock_cloudformation_deprecated, mock_ec2, mock_ec2_deprecated
+from moto import mock_cloudformation, mock_ec2, mock_ec2_deprecated
 
 
 @mock_ec2_deprecated
@@ -299,11 +299,11 @@ def test_get_subnets_filtering():
     ).should.throw(NotImplementedError)
 
 
-@mock_ec2_deprecated
-@mock_cloudformation_deprecated
+@mock_ec2
+@mock_cloudformation
 def test_subnet_tags_through_cloudformation():
-    vpc_conn = boto.vpc.connect_to_region("us-west-1")
-    vpc = vpc_conn.create_vpc("10.0.0.0/16")
+    vpc_conn = boto3.client("ec2", region_name="us-west-1")
+    vpc = vpc_conn.create_vpc(CidrBlock="10.0.0.0/16")["Vpc"]
 
     subnet_template = {
         "AWSTemplateFormatVersion": "2010-09-09",
@@ -311,7 +311,7 @@ def test_subnet_tags_through_cloudformation():
             "testSubnet": {
                 "Type": "AWS::EC2::Subnet",
                 "Properties": {
-                    "VpcId": vpc.id,
+                    "VpcId": vpc["VpcId"],
                     "CidrBlock": "10.0.0.0/24",
                     "AvailabilityZone": "us-west-1b",
                     "Tags": [
@@ -322,13 +322,16 @@ def test_subnet_tags_through_cloudformation():
             }
         },
     }
-    cf_conn = boto.cloudformation.connect_to_region("us-west-1")
+    cf_conn = boto3.client("cloudformation", region_name="us-west-1")
     template_json = json.dumps(subnet_template)
-    cf_conn.create_stack("test_stack", template_body=template_json)
+    cf_conn.create_stack(StackName="test_stack", TemplateBody=template_json)
 
-    subnet = vpc_conn.get_all_subnets(filters={"cidrBlock": "10.0.0.0/24"})[0]
-    subnet.tags["foo"].should.equal("bar")
-    subnet.tags["blah"].should.equal("baz")
+    subnet = vpc_conn.describe_subnets(
+        Filters=[{"Name": "cidrBlock", "Values": ["10.0.0.0/24"]}]
+    )["Subnets"][0]
+    tags = {item["Key"]: item["Value"] for item in subnet["Tags"]}
+    tags["foo"].should.equal("bar")
+    tags["blah"].should.equal("baz")
 
 
 @mock_ec2

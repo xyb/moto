@@ -20,9 +20,6 @@ mock_lambda = lazy_load(".awslambda", "mock_lambda")
 mock_batch = lazy_load(".batch", "mock_batch")
 mock_batch = lazy_load(".batch", "mock_batch")
 mock_cloudformation = lazy_load(".cloudformation", "mock_cloudformation")
-mock_cloudformation_deprecated = lazy_load(
-    ".cloudformation", "mock_cloudformation_deprecated"
-)
 mock_cloudwatch = lazy_load(".cloudwatch", "mock_cloudwatch")
 mock_cloudwatch_deprecated = lazy_load(".cloudwatch", "mock_cloudwatch_deprecated")
 mock_codecommit = lazy_load(".codecommit", "mock_codecommit")
