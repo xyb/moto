@@ -97,6 +97,50 @@ def test_creating_subscription():
 
 
 @mock_sns
+def test_deleting_subscriptions_by_deleting_topic():
+    conn = boto3.client("sns", region_name="us-west-1")
+    conn.create_topic(Name="some-topic")
+    topic_arn = conn.list_topics()['Topics'][0]['TopicArn']
+
+    conn.subscribe(
+        TopicArn=topic_arn,
+        Protocol="http",
+        Endpoint="http://example.com/",
+    )
+
+    subscriptions = conn.list_subscriptions()["Subscriptions"]
+    subscriptions.should.have.length_of(1)
+    subscription = subscriptions[0]
+    subscription_arn = subscription["SubscriptionArn"]
+    subscription_arn.should.contain(topic_arn)
+    subscription["TopicArn"].should.equal(topic_arn)
+    subscription["Protocol"].should.equal("http")
+    subscription["Endpoint"].should.equal("http://example.com/")
+
+    # Now delete the topic
+    conn.delete_topic(TopicArn=topic_arn)
+
+    # And there should now be 0 topics
+    topics = conn.list_topics()['Topics']
+    topics.should.have.length_of(0)
+
+    # And the subscription should still be left
+    subscriptions = conn.list_subscriptions()["Subscriptions"]
+    subscriptions.should.have.length_of(1)
+    subscription = subscriptions[0]
+    subscription["SubscriptionArn"].should.equal(subscription_arn)
+
+    # Now delete hanging subscription
+    conn.unsubscribe(SubscriptionArn=subscription_arn)
+
+    subscriptions = conn.list_subscriptions()["Subscriptions"]
+    subscriptions.should.have.length_of(0)
+
+    # Deleting it again should not result in any error
+    conn.unsubscribe(SubscriptionArn=subscription_arn)
+
+
+@mock_sns
 def test_unsubscribe_from_deleted_topic():
     client = boto3.client("sns", region_name="us-east-1")
     client.create_topic(Name="some-topic")

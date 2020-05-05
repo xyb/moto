@@ -312,3 +312,33 @@ def test_get_sms_attributes_filtered():
     response["attributes"].should.contain("DefaultSMSType")
     response["attributes"].should_not.contain("test")
     response["attributes"]["DefaultSMSType"].should.equal("Transactional")
+
+
+@mock_sns
+def test_delete_endpoint():
+    conn = boto3.client("sns", region_name="us-west-1")
+    platform_application = conn.create_platform_application(
+        Name="my-application", Platform="APNS", Attributes={},
+    )
+    application_arn = platform_application["PlatformApplicationArn"]
+
+    endpoint = conn.create_platform_endpoint(
+        PlatformApplicationArn=application_arn,
+        Token="some_unique_id",
+        CustomUserData="some user data",
+        Attributes={"Enabled": "false", "CustomUserData": "some data"},
+    )
+    endpoint_arn = endpoint["EndpointArn"]
+
+    endpoint_list = conn.list_endpoints_by_platform_application(
+        PlatformApplicationArn=application_arn
+    )["Endpoints"]
+
+    endpoint_list.should.have.length_of(1)
+
+    conn.delete_endpoint(EndpointArn=endpoint_arn)
+
+    endpoint_list = conn.list_endpoints_by_platform_application(
+        PlatformApplicationArn=application_arn
+    )["Endpoints"]
+    endpoint_list.should.have.length_of(0)
