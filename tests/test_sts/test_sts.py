@@ -23,7 +23,8 @@ def test_get_session_token():
     conn = boto3.client("sts", region_name="us-west-1")
     token = conn.get_session_token(DurationSeconds=900)['Credentials']
 
-    token['Expiration'].should.equal(datetime.datetime(2012, 1, 1, 12, 15, tzinfo=tzutc()))
+    if not settings.TEST_SERVER_MODE:
+        token['Expiration'].should.equal(datetime.datetime(2012, 1, 1, 12, 15, tzinfo=tzutc()))
     token['SessionToken'].should.equal(
         "AQoEXAMPLEH4aoAH0gNCAPyJxz4BlCFFxWNE1OPTgk5TthT+FvwqnKwRcOIfrRh3c/LTo6UDdyJwOOvEVPvLXCrrrUtdnniCEXAMPLE/IvU1dYUg2RVAJBanLiHb4IgRmpRV3zrkuWJOgQs8IZZaIv2BXIa2R4OlgkBN9bkUDNCJiBeb/AXlzBBko7b15fjrBs2+cTQtpZ3CYWFXG8C5zqx37wnOE49mRl/+OtkIKGO7fAE"
     )
@@ -38,7 +39,8 @@ def test_get_federation_token():
     token_name = "Bob"
     token = conn.get_federation_token(DurationSeconds=900, Name=token_name)
 
-    token['Credentials']['Expiration'].should.equal(datetime.datetime(2012, 1, 1, 12, 15, tzinfo=tzutc()))
+    if not settings.TEST_SERVER_MODE:
+        token['Credentials']['Expiration'].should.equal(datetime.datetime(2012, 1, 1, 12, 15, tzinfo=tzutc()))
     token['Credentials']['SessionToken'].should.equal(
         "AQoDYXdzEPT//////////wEXAMPLEtc764bNrC9SAPBSM22wDOk4x4HIZ8j4FZTwdQWLWsKWHGBuFqwAeMicRXmxfpSPfIeoIYRqTflfKD8YUuwthAx7mSEI/qkPpKPi/kMcGdQrmGdeehM4IC1NtBmUpp2wUE8phUZampKsburEDy0KPkyQDYwT7WZ0wq5VSXDvp75YU9HFvlRd8Tx6q6fE8YQcHNVXAkiY9q6d+xo0rKwT38xVqr7ZD0u0iPPkUL64lIZbqBAz+scqKmlzm8FDrypNC9Yjc8fPOLn9FX9KSYvKTr4rvx3iSIlTJabIQwj2ICCR/oLxBA=="
     )
@@ -259,9 +261,10 @@ def test_assume_role_with_web_identity():
     )
 
     credentials = role['Credentials']
-    credentials['Expiration'].should.equal(
-        datetime.datetime(2012, 1, 1, 12, 15, tzinfo=tzutc())
-    )
+    if not settings.TEST_SERVER_MODE:
+        credentials['Expiration'].should.equal(
+            datetime.datetime(2012, 1, 1, 12, 15, tzinfo=tzutc())
+        )
     credentials['SessionToken'].should.have.length_of(356)
     assert credentials['SessionToken'].startswith("FQoGZXIvYXdzE")
     credentials['AccessKeyId'].should.have.length_of(20)

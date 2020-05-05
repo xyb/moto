@@ -23,6 +23,7 @@ from moto import (
     mock_s3,
     mock_route53,
     mock_iam,
+    settings,
 )
 from moto.cloudformation import cloudformation_backends
 
@@ -215,25 +216,26 @@ def test_update_stack_replace_tags():
     stack["Tags"][0]["Value"].should.equal("baz")
 
 
-@mock_cloudformation
-def test_update_stack_when_rolled_back():
-    region_name = "us-east-1"
-    conn = boto3.client("cloudformation", region_name=region_name)
-    stack_id = conn.create_stack(
-        StackName="test_stack", TemplateBody=dummy_template_json
-    )["StackId"]
+if not settings.TEST_SERVER_MODE:
+    @mock_cloudformation
+    def test_update_stack_when_rolled_back():
+        region_name = "us-east-1"
+        conn = boto3.client("cloudformation", region_name=region_name)
+        stack_id = conn.create_stack(
+            StackName="test_stack", TemplateBody=dummy_template_json
+        )["StackId"]
 
-    cloudformation_backends[region_name].stacks[stack_id].status = "ROLLBACK_COMPLETE"
+        cloudformation_backends[region_name].stacks[stack_id].status = "ROLLBACK_COMPLETE"
 
-    with assert_raises(ClientError) as err:
-        conn.update_stack(StackName="test_stack", TemplateBody=dummy_template_json)
+        with assert_raises(ClientError) as err:
+            conn.update_stack(StackName="test_stack", TemplateBody=dummy_template_json)
 
-    ex = err.exception.response
-    ex["Error"]["Message"].should.match(
-        r"is in ROLLBACK_COMPLETE state and can not be updated"
-    )
-    ex["Error"]["Code"].should.equal("ValidationError")
-    ex["ResponseMetadata"]["HTTPStatusCode"].should.equal(400)
+        ex = err.exception.response
+        ex["Error"]["Message"].should.match(
+            r"is in ROLLBACK_COMPLETE state and can not be updated"
+        )
+        ex["Error"]["Code"].should.equal("ValidationError")
+        ex["ResponseMetadata"]["HTTPStatusCode"].should.equal(400)
 
 
 @mock_cloudformation
@@ -333,7 +335,7 @@ def test_create_stack_kinesis():
 
 def get_role_name():
     with mock_iam():
-        iam = boto3.client("iam")
+        iam = boto3.client("iam", region_name='us-west-1')
         role = iam.create_role(
             AssumeRolePolicyDocument="{}",
             RoleName="my-role",
