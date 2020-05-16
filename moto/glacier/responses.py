@@ -31,6 +31,7 @@ class GlacierResponse(_TemplateEnvironmentMixin):
     @classmethod
     def vault_response(clazz, request, full_url, headers):
         region_name = region_from_glacier_url(full_url)
+        import pdb;pdb.set_trace()
         response_instance = GlacierResponse(glacier_backends[region_name])
         return response_instance._vault_response(request, full_url, headers)
 

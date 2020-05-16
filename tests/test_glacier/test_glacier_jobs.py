@@ -22,12 +22,12 @@ def test_init_glacier_job():
         vaultName=vault_name, jobParameters={"ArchiveId": archive_id, "Type": "archive-retrieval"}
     )
     job_id = job_response["jobId"]
-    job_response["location"].should.equal("//vaults/my_vault/jobs/{0}".format(job_id))
+    job_response["location"].should.contain("//vaults/my_vault/jobs/{0}".format(job_id))
 
 
 @mock_glacier
 def test_describe_job():
-    conn = boto3.client("glacier", region_name="us-west-2")
+    conn = boto3.client("glacier", region_name="us-east-1")
     vault_name = "my_vault"
     conn.create_vault(vaultName=vault_name)
     archive_id = conn.upload_archive(
@@ -43,7 +43,7 @@ def test_describe_job():
     job.should.have.key("Tier").which.should.equal("Standard")
     job.should.have.key("StatusCode").which.should.equal("InProgress")
     job.should.have.key("VaultARN").which.should.equal(
-        "arn:aws:glacier:us-west-2:012345678901:vaults/my_vault"
+        "arn:aws:glacier:us-east-1:012345678901:vaults/my_vault"
     )
 
 
