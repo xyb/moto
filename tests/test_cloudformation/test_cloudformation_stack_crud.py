@@ -241,72 +241,74 @@ if not settings.TEST_SERVER_MODE:
         ex["ResponseMetadata"]["HTTPStatusCode"].should.equal(400)
 
 
-@mock_cloudformation
-def test_create_stack_lambda_and_dynamodb():
-    conn = boto3.client("cloudformation", region_name="us-east-1")
-    dummy_template = {
-        "AWSTemplateFormatVersion": "2010-09-09",
-        "Description": "Stack Lambda Test 1",
-        "Parameters": {},
-        "Resources": {
-            "func1": {
-                "Type": "AWS::Lambda::Function",
-                "Properties": {
-                    "Code": {"S3Bucket": "bucket_123", "S3Key": "key_123"},
-                    "FunctionName": "func1",
-                    "Handler": "handler.handler",
-                    "Role": get_role_name(),
-                    "Runtime": "python2.7",
-                    "Description": "descr",
-                    "MemorySize": 12345,
+if not settings.TEST_SERVER_MODE:
+    # This test requrie setting an environment variable
+    @mock_cloudformation
+    def test_create_stack_lambda_and_dynamodb():
+        conn = boto3.client("cloudformation", region_name="us-east-1")
+        dummy_template = {
+            "AWSTemplateFormatVersion": "2010-09-09",
+            "Description": "Stack Lambda Test 1",
+            "Parameters": {},
+            "Resources": {
+                "func1": {
+                    "Type": "AWS::Lambda::Function",
+                    "Properties": {
+                        "Code": {"S3Bucket": "bucket_123", "S3Key": "key_123"},
+                        "FunctionName": "func1",
+                        "Handler": "handler.handler",
+                        "Role": get_role_name(),
+                        "Runtime": "python2.7",
+                        "Description": "descr",
+                        "MemorySize": 12345,
+                    },
                 },
-            },
-            "func1version": {
-                "Type": "AWS::Lambda::Version",
-                "Properties": {"FunctionName": {"Ref": "func1"}},
-            },
-            "tab1": {
-                "Type": "AWS::DynamoDB::Table",
-                "Properties": {
-                    "TableName": "tab1",
-                    "KeySchema": [{"AttributeName": "attr1", "KeyType": "HASH"}],
-                    "AttributeDefinitions": [
-                        {"AttributeName": "attr1", "AttributeType": "string"}
-                    ],
-                    "ProvisionedThroughput": {
-                        "ReadCapacityUnits": 10,
-                        "WriteCapacityUnits": 10,
+                "func1version": {
+                    "Type": "AWS::Lambda::Version",
+                    "Properties": {"FunctionName": {"Ref": "func1"}},
+                },
+                "tab1": {
+                    "Type": "AWS::DynamoDB::Table",
+                    "Properties": {
+                        "TableName": "tab1",
+                        "KeySchema": [{"AttributeName": "attr1", "KeyType": "HASH"}],
+                        "AttributeDefinitions": [
+                            {"AttributeName": "attr1", "AttributeType": "string"}
+                        ],
+                        "ProvisionedThroughput": {
+                            "ReadCapacityUnits": 10,
+                            "WriteCapacityUnits": 10,
+                        },
+                    },
+                },
+                "func1mapping": {
+                    "Type": "AWS::Lambda::EventSourceMapping",
+                    "Properties": {
+                        "FunctionName": {"Ref": "func1"},
+                        "EventSourceArn": "arn:aws:dynamodb:region:XXXXXX:table/tab1/stream/2000T00:00:00.000",
+                        "StartingPosition": "0",
+                        "BatchSize": 100,
+                        "Enabled": True,
                     },
                 },
             },
-            "func1mapping": {
-                "Type": "AWS::Lambda::EventSourceMapping",
-                "Properties": {
-                    "FunctionName": {"Ref": "func1"},
-                    "EventSourceArn": "arn:aws:dynamodb:region:XXXXXX:table/tab1/stream/2000T00:00:00.000",
-                    "StartingPosition": "0",
-                    "BatchSize": 100,
-                    "Enabled": True,
-                },
-            },
-        },
-    }
-    validate_s3_before = os.environ.get("VALIDATE_LAMBDA_S3", "")
-    try:
-        os.environ["VALIDATE_LAMBDA_S3"] = "false"
-        conn.create_stack(
-            StackName="test_stack_lambda_1",
-            TemplateBody=json.dumps(dummy_template),
-            Parameters=[],
-        )
-    finally:
-        os.environ["VALIDATE_LAMBDA_S3"] = validate_s3_before
+        }
+        validate_s3_before = os.environ.get("VALIDATE_LAMBDA_S3", "")
+        try:
+            os.environ["VALIDATE_LAMBDA_S3"] = "false"
+            conn.create_stack(
+                StackName="test_stack_lambda_1",
+                TemplateBody=json.dumps(dummy_template),
+                Parameters=[],
+            )
+        finally:
+            os.environ["VALIDATE_LAMBDA_S3"] = validate_s3_before
 
-    stack = conn.describe_stacks()["Stacks"][0]
-    resources = conn.list_stack_resources(StackName="test_stack_lambda_1")[
-        "StackResourceSummaries"
-    ]
-    assert len(resources) == 4
+        stack = conn.describe_stacks()["Stacks"][0]
+        resources = conn.list_stack_resources(StackName="test_stack_lambda_1")[
+            "StackResourceSummaries"
+        ]
+        assert len(resources) == 4
 
 
 @mock_cloudformation
