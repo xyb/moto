@@ -100,12 +100,10 @@ def test_creating_subscription():
 def test_deleting_subscriptions_by_deleting_topic():
     conn = boto3.client("sns", region_name="us-west-1")
     conn.create_topic(Name="some-topic")
-    topic_arn = conn.list_topics()['Topics'][0]['TopicArn']
+    topic_arn = conn.list_topics()["Topics"][0]["TopicArn"]
 
     conn.subscribe(
-        TopicArn=topic_arn,
-        Protocol="http",
-        Endpoint="http://example.com/",
+        TopicArn=topic_arn, Protocol="http", Endpoint="http://example.com/",
     )
 
     subscriptions = conn.list_subscriptions()["Subscriptions"]
@@ -121,7 +119,7 @@ def test_deleting_subscriptions_by_deleting_topic():
     conn.delete_topic(TopicArn=topic_arn)
 
     # And there should now be 0 topics
-    topics = conn.list_topics()['Topics']
+    topics = conn.list_topics()["Topics"]
     topics.should.have.length_of(0)
 
     # And the subscription should still be left

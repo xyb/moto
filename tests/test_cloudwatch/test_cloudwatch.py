@@ -35,24 +35,24 @@ def test_create_alarm():
     alarm = alarm_fixture()
     conn.put_metric_alarm(**alarm)
 
-    alarms = conn.describe_alarms()['MetricAlarms']
+    alarms = conn.describe_alarms()["MetricAlarms"]
     alarms.should.have.length_of(1)
     alarm = alarms[0]
-    alarm['AlarmName'].should.equal("tester")
-    alarm['Namespace'].should.equal("tester_namespace")
-    alarm['MetricName'].should.equal("tester_metric")
-    alarm['ComparisonOperator'].should.equal("GreaterThanOrEqualToThreshold")
-    alarm['Threshold'].should.equal(2.0)
-    alarm['Period'].should.equal(60)
-    alarm['EvaluationPeriods'].should.equal(5)
-    alarm['Statistic'].should.equal("Average")
-    alarm['AlarmDescription'].should.equal("A test")
-    alarm['Dimensions'][0]['Name'].should.equal("InstanceId")
-    alarm['Dimensions'][0]['Value'].should.equal("i-0123456,i-0123457")
-    list(alarm['AlarmActions']).should.equal(["arn:alarm"])
-    list(alarm['OKActions']).should.equal(["arn:ok"])
-    list(alarm['InsufficientDataActions']).should.equal(["arn:insufficient"])
-    alarm['Unit'].should.equal("Seconds")
+    alarm["AlarmName"].should.equal("tester")
+    alarm["Namespace"].should.equal("tester_namespace")
+    alarm["MetricName"].should.equal("tester_metric")
+    alarm["ComparisonOperator"].should.equal("GreaterThanOrEqualToThreshold")
+    alarm["Threshold"].should.equal(2.0)
+    alarm["Period"].should.equal(60)
+    alarm["EvaluationPeriods"].should.equal(5)
+    alarm["Statistic"].should.equal("Average")
+    alarm["AlarmDescription"].should.equal("A test")
+    alarm["Dimensions"][0]["Name"].should.equal("InstanceId")
+    alarm["Dimensions"][0]["Value"].should.equal("i-0123456,i-0123457")
+    list(alarm["AlarmActions"]).should.equal(["arn:alarm"])
+    list(alarm["OKActions"]).should.equal(["arn:ok"])
+    list(alarm["InsufficientDataActions"]).should.equal(["arn:insufficient"])
+    alarm["Unit"].should.equal("Seconds")
 
 
 @mock_cloudwatch
@@ -60,19 +60,19 @@ def test_delete_alarm():
     conn = boto3.client("cloudwatch", region_name="us-west-1")
     cloudwatch = boto3.resource("cloudwatch", region_name="us-west-1")
 
-    alarms = conn.describe_alarms()['MetricAlarms']
+    alarms = conn.describe_alarms()["MetricAlarms"]
     alarms.should.have.length_of(0)
 
     alarm = alarm_fixture()
     conn.put_metric_alarm(**alarm)
 
-    alarms = conn.describe_alarms()['MetricAlarms']
+    alarms = conn.describe_alarms()["MetricAlarms"]
     alarms.should.have.length_of(1)
 
-    alarm = cloudwatch.Alarm(alarm['AlarmName'])
+    alarm = cloudwatch.Alarm(alarm["AlarmName"])
     alarm.delete()
 
-    alarms = conn.describe_alarms()['MetricAlarms']
+    alarms = conn.describe_alarms()["MetricAlarms"]
     alarms.should.have.length_of(0)
 
 
@@ -82,32 +82,31 @@ def test_put_metric_data():
 
     conn.put_metric_data(
         Namespace="tester",
-        MetricData=[{
-            "MetricName": "metric",
-            "Value": 1.5,
-            "Dimensions": [{
-                "Name": "InstanceId",
-                "Value": "i-0123456,i-0123457",
-            }],
-        }],
+        MetricData=[
+            {
+                "MetricName": "metric",
+                "Value": 1.5,
+                "Dimensions": [{"Name": "InstanceId", "Value": "i-0123456,i-0123457",}],
+            }
+        ],
     )
 
-    metrics = conn.list_metrics()['Metrics']
-    metric_names = [m for m in metrics if m['MetricName'] == "metric"]
+    metrics = conn.list_metrics()["Metrics"]
+    metric_names = [m for m in metrics if m["MetricName"] == "metric"]
     metric_names.should.have(1)
     metric = metrics[0]
-    metric['Namespace'].should.equal("tester")
-    metric['MetricName'].should.equal("metric")
-    dimension = metric['Dimensions'][0]
-    dimension['Name'].should.equal("InstanceId")
-    dimension['Value'].should.equal("i-0123456,i-0123457")
+    metric["Namespace"].should.equal("tester")
+    metric["MetricName"].should.equal("metric")
+    dimension = metric["Dimensions"][0]
+    dimension["Name"].should.equal("InstanceId")
+    dimension["Value"].should.equal("i-0123456,i-0123457")
 
 
 @mock_cloudwatch
 def test_describe_alarms():
     conn = boto3.client("cloudwatch", region_name="us-west-1")
 
-    alarms = conn.describe_alarms()['MetricAlarms']
+    alarms = conn.describe_alarms()["MetricAlarms"]
     alarms.should.have.length_of(0)
 
     conn.put_metric_alarm(**alarm_fixture(name="nfoobar", action=["afoobar"]))
@@ -116,26 +115,28 @@ def test_describe_alarms():
     conn.put_metric_alarm(**alarm_fixture(name="nbazfoo", action=["abazfoo"]))
 
     enabled = alarm_fixture(name="enabled1", action=["abarfoo"])
-    enabled['AlarmActions'].append("arn:alarm")
-    enabled['ActionsEnabled'] = True
+    enabled["AlarmActions"].append("arn:alarm")
+    enabled["ActionsEnabled"] = True
     conn.put_metric_alarm(**enabled)
 
-    alarms = conn.describe_alarms()['MetricAlarms']
+    alarms = conn.describe_alarms()["MetricAlarms"]
     alarms.should.have.length_of(5)
-    alarms = conn.describe_alarms(AlarmNamePrefix="nfoo")['MetricAlarms']
+    alarms = conn.describe_alarms(AlarmNamePrefix="nfoo")["MetricAlarms"]
     alarms.should.have.length_of(2)
-    alarms = conn.describe_alarms(AlarmNames=["nfoobar", "nbarfoo", "nbazfoo"])['MetricAlarms']
+    alarms = conn.describe_alarms(AlarmNames=["nfoobar", "nbarfoo", "nbazfoo"])[
+        "MetricAlarms"
+    ]
     alarms.should.have.length_of(3)
-    alarms = conn.describe_alarms(ActionPrefix="afoo")['MetricAlarms']
+    alarms = conn.describe_alarms(ActionPrefix="afoo")["MetricAlarms"]
     alarms.should.have.length_of(2)
-    alarms = conn.describe_alarms(AlarmNamePrefix="enabled")['MetricAlarms']
+    alarms = conn.describe_alarms(AlarmNamePrefix="enabled")["MetricAlarms"]
     alarms.should.have.length_of(1)
-    alarms[0]['ActionsEnabled'].should.equal(True)
+    alarms[0]["ActionsEnabled"].should.equal(True)
 
-    for alarm in conn.describe_alarms()['MetricAlarms']:
-        conn.delete_alarms(AlarmNames=[alarm['AlarmName']])
+    for alarm in conn.describe_alarms()["MetricAlarms"]:
+        conn.delete_alarms(AlarmNames=[alarm["AlarmName"]])
 
-    alarms = conn.describe_alarms()['MetricAlarms']
+    alarms = conn.describe_alarms()["MetricAlarms"]
     alarms.should.have.length_of(0)
 
 

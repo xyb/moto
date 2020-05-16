@@ -21,15 +21,17 @@ from moto.sts.responses import MAX_FEDERATION_TOKEN_POLICY_LENGTH
 @mock_sts
 def test_get_session_token():
     conn = boto3.client("sts", region_name="us-west-1")
-    token = conn.get_session_token(DurationSeconds=900)['Credentials']
+    token = conn.get_session_token(DurationSeconds=900)["Credentials"]
 
     if not settings.TEST_SERVER_MODE:
-        token['Expiration'].should.equal(datetime.datetime(2012, 1, 1, 12, 15, tzinfo=tzutc()))
-    token['SessionToken'].should.equal(
+        token["Expiration"].should.equal(
+            datetime.datetime(2012, 1, 1, 12, 15, tzinfo=tzutc())
+        )
+    token["SessionToken"].should.equal(
         "AQoEXAMPLEH4aoAH0gNCAPyJxz4BlCFFxWNE1OPTgk5TthT+FvwqnKwRcOIfrRh3c/LTo6UDdyJwOOvEVPvLXCrrrUtdnniCEXAMPLE/IvU1dYUg2RVAJBanLiHb4IgRmpRV3zrkuWJOgQs8IZZaIv2BXIa2R4OlgkBN9bkUDNCJiBeb/AXlzBBko7b15fjrBs2+cTQtpZ3CYWFXG8C5zqx37wnOE49mRl/+OtkIKGO7fAE"
     )
-    token['AccessKeyId'].should.equal("AKIAIOSFODNN7EXAMPLE")
-    token['SecretAccessKey'].should.equal("wJalrXUtnFEMI/K7MDENG/bPxRfiCYzEXAMPLEKEY")
+    token["AccessKeyId"].should.equal("AKIAIOSFODNN7EXAMPLE")
+    token["SecretAccessKey"].should.equal("wJalrXUtnFEMI/K7MDENG/bPxRfiCYzEXAMPLEKEY")
 
 
 @freeze_time("2012-01-01 12:00:00")
@@ -40,20 +42,24 @@ def test_get_federation_token():
     token = conn.get_federation_token(DurationSeconds=900, Name=token_name)
 
     if not settings.TEST_SERVER_MODE:
-        token['Credentials']['Expiration'].should.equal(datetime.datetime(2012, 1, 1, 12, 15, tzinfo=tzutc()))
-    token['Credentials']['SessionToken'].should.equal(
+        token["Credentials"]["Expiration"].should.equal(
+            datetime.datetime(2012, 1, 1, 12, 15, tzinfo=tzutc())
+        )
+    token["Credentials"]["SessionToken"].should.equal(
         "AQoDYXdzEPT//////////wEXAMPLEtc764bNrC9SAPBSM22wDOk4x4HIZ8j4FZTwdQWLWsKWHGBuFqwAeMicRXmxfpSPfIeoIYRqTflfKD8YUuwthAx7mSEI/qkPpKPi/kMcGdQrmGdeehM4IC1NtBmUpp2wUE8phUZampKsburEDy0KPkyQDYwT7WZ0wq5VSXDvp75YU9HFvlRd8Tx6q6fE8YQcHNVXAkiY9q6d+xo0rKwT38xVqr7ZD0u0iPPkUL64lIZbqBAz+scqKmlzm8FDrypNC9Yjc8fPOLn9FX9KSYvKTr4rvx3iSIlTJabIQwj2ICCR/oLxBA=="
     )
-    token['Credentials']['AccessKeyId'].should.equal("AKIAIOSFODNN7EXAMPLE")
-    token['Credentials']['SecretAccessKey'].should.equal(
+    token["Credentials"]["AccessKeyId"].should.equal("AKIAIOSFODNN7EXAMPLE")
+    token["Credentials"]["SecretAccessKey"].should.equal(
         "wJalrXUtnFEMI/K7MDENG/bPxRfiCYzEXAMPLEKEY"
     )
-    token['FederatedUser']['Arn'].should.equal(
+    token["FederatedUser"]["Arn"].should.equal(
         "arn:aws:sts::{account_id}:federated-user/{token_name}".format(
             account_id=ACCOUNT_ID, token_name=token_name
         )
     )
-    token['FederatedUser']['FederatedUserId'].should.equal(str(ACCOUNT_ID) + ":" + token_name)
+    token["FederatedUser"]["FederatedUserId"].should.equal(
+        str(ACCOUNT_ID) + ":" + token_name
+    )
 
 
 @freeze_time("2012-01-01 12:00:00")
@@ -260,23 +266,23 @@ def test_assume_role_with_web_identity():
         WebIdentityToken="foobar",
     )
 
-    credentials = role['Credentials']
+    credentials = role["Credentials"]
     if not settings.TEST_SERVER_MODE:
-        credentials['Expiration'].should.equal(
+        credentials["Expiration"].should.equal(
             datetime.datetime(2012, 1, 1, 12, 15, tzinfo=tzutc())
         )
-    credentials['SessionToken'].should.have.length_of(356)
-    assert credentials['SessionToken'].startswith("FQoGZXIvYXdzE")
-    credentials['AccessKeyId'].should.have.length_of(20)
-    assert credentials['AccessKeyId'].startswith("ASIA")
-    credentials['SecretAccessKey'].should.have.length_of(40)
+    credentials["SessionToken"].should.have.length_of(356)
+    assert credentials["SessionToken"].startswith("FQoGZXIvYXdzE")
+    credentials["AccessKeyId"].should.have.length_of(20)
+    assert credentials["AccessKeyId"].startswith("ASIA")
+    credentials["SecretAccessKey"].should.have.length_of(40)
 
-    role['AssumedRoleUser']['Arn'].should.equal(
+    role["AssumedRoleUser"]["Arn"].should.equal(
         "arn:aws:sts::{account_id}:assumed-role/{role_name}/{session_name}".format(
             account_id=ACCOUNT_ID, role_name=role_name, session_name=session_name
         )
     )
-    role['AssumedRoleUser']['AssumedRoleId'].should.contain("session-name")
+    role["AssumedRoleUser"]["AssumedRoleId"].should.contain("session-name")
 
 
 @mock_sts

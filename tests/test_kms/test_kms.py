@@ -252,7 +252,9 @@ def test_put_key_policy_via_alias_should_not_update():
         KeyId="alias/my-key-alias", PolicyName="default", Policy="new policy"
     ).should.throw(ClientError)
 
-    policy = conn.get_key_policy(KeyId=key["KeyMetadata"]["KeyId"], PolicyName="default")
+    policy = conn.get_key_policy(
+        KeyId=key["KeyMetadata"]["KeyId"], PolicyName="default"
+    )
     policy["Policy"].should.equal("my policy")
 
 
@@ -263,9 +265,13 @@ def test_put_key_policy():
     key = conn.create_key(
         Policy="my policy", Description="my key1", KeyUsage="ENCRYPT_DECRYPT"
     )
-    conn.put_key_policy(KeyId=key["KeyMetadata"]["Arn"], PolicyName="default", Policy="new policy")
+    conn.put_key_policy(
+        KeyId=key["KeyMetadata"]["Arn"], PolicyName="default", Policy="new policy"
+    )
 
-    policy = conn.get_key_policy(KeyId=key["KeyMetadata"]["KeyId"], PolicyName="default")
+    policy = conn.get_key_policy(
+        KeyId=key["KeyMetadata"]["KeyId"], PolicyName="default"
+    )
     policy["Policy"].should.equal("new policy")
 
 
@@ -289,7 +295,7 @@ def test__create_alias__returns_none_if_correct():
     key_id = create_resp["KeyMetadata"]["KeyId"]
 
     resp = conn.create_alias(AliasName="alias/my-alias", TargetKeyId=key_id)
-    resp.pop('ResponseMetadata')
+    resp.pop("ResponseMetadata")
     resp.should.equal({})
 
 
@@ -311,8 +317,8 @@ def test__create_alias__raises_if_reserved_alias():
             conn.create_alias(AliasName=alias_name, TargetKeyId=key_id)
 
         ex = err.exception
-        ex.response['Error']['Code'].should.equal("NotAuthorizedException")
-        ex.response['ResponseMetadata']['HTTPStatusCode'].should.equal(400)
+        ex.response["Error"]["Code"].should.equal("NotAuthorizedException")
+        ex.response["ResponseMetadata"]["HTTPStatusCode"].should.equal(400)
 
 
 @mock_kms
@@ -336,9 +342,9 @@ def test__create_alias__raises_if_wrong_prefix():
         conn.create_alias(AliasName="wrongprefix/my-alias", TargetKeyId=key_id)
 
     ex = err.exception
-    ex.response['Error']['Message'].should.equal("Invalid identifier")
-    ex.response['Error']['Code'].should.equal("ValidationException")
-    ex.response['ResponseMetadata']['HTTPStatusCode'].should.equal(400)
+    ex.response["Error"]["Message"].should.equal("Invalid identifier")
+    ex.response["Error"]["Code"].should.equal("ValidationException")
+    ex.response["ResponseMetadata"]["HTTPStatusCode"].should.equal(400)
 
 
 @mock_kms
@@ -355,19 +361,19 @@ def test__create_alias__raises_if_duplicate():
         conn.create_alias(AliasName=alias, TargetKeyId=key_id)
 
     ex = err.exception
-    ex.response['Error']['Message'].should.match(
+    ex.response["Error"]["Message"].should.match(
         r"An alias with the name arn:aws:kms:{region}:\d{{12}}:{alias} already exists".format(
             **locals()
         )
     )
-    ex.response['Error']['Code'].should.equal("AlreadyExistsException")
+    ex.response["Error"]["Code"].should.equal("AlreadyExistsException")
 
-    ex.response['message'].should.match(
+    ex.response["message"].should.match(
         r"An alias with the name arn:aws:kms:{region}:\d{{12}}:{alias} already exists".format(
             **locals()
         )
     )
-    ex.response['ResponseMetadata']['HTTPStatusCode'].should.equal(400)
+    ex.response["ResponseMetadata"]["HTTPStatusCode"].should.equal(400)
 
 
 @mock_kms
@@ -386,14 +392,13 @@ def test__create_alias__raises_if_alias_has_restricted_characters():
         with assert_raises(ClientError) as err:
             conn.create_alias(AliasName=alias_name, TargetKeyId=key_id)
         ex = err.exception
-        ex.response['Error']['Message'].should.contain(
+        ex.response["Error"]["Message"].should.contain(
             "1 validation error detected: Value '{alias_name}' at 'aliasName' failed to satisfy constraint: Member must satisfy regular expression pattern: ^[a-zA-Z0-9:/_-]+$".format(
                 **locals()
             )
         )
-        ex.response['Error']['Code'].should.equal("ValidationException")
-        ex.response['ResponseMetadata']['HTTPStatusCode'].should.equal(400)
-
+        ex.response["Error"]["Code"].should.equal("ValidationException")
+        ex.response["ResponseMetadata"]["HTTPStatusCode"].should.equal(400)
 
 
 @mock_kms
@@ -410,11 +415,11 @@ def test__create_alias__raises_if_alias_has_colon_character():
         with assert_raises(ClientError) as err:
             conn.create_alias(AliasName=alias_name, TargetKeyId=key_id)
         ex = err.exception
-        ex.response['Error']['Code'].should.equal("ValidationException")
-        ex.response['Error']['Message'].should.equal(
+        ex.response["Error"]["Code"].should.equal("ValidationException")
+        ex.response["Error"]["Message"].should.equal(
             "{alias_name} contains invalid characters for an alias".format(**locals())
         )
-        ex.response['ResponseMetadata']['HTTPStatusCode'].should.equal(400)
+        ex.response["ResponseMetadata"]["HTTPStatusCode"].should.equal(400)
 
 
 @parameterized((("alias/my-alias_/",), ("alias/my_alias-/",)))
@@ -440,11 +445,11 @@ def test__create_alias__raises_if_target_key_id_is_existing_alias():
         conn.create_alias(AliasName=alias, TargetKeyId=alias)
 
     ex = err.exception
-    ex.response['Error']['Code'].should.equal("ValidationException")
-    ex.response['Error']['Message'].should.equal(
+    ex.response["Error"]["Code"].should.equal("ValidationException")
+    ex.response["Error"]["Message"].should.equal(
         "Aliases must refer to keys. Not aliases"
     )
-    ex.response['ResponseMetadata']['HTTPStatusCode'].should.equal(400)
+    ex.response["ResponseMetadata"]["HTTPStatusCode"].should.equal(400)
 
 
 @mock_kms
@@ -465,7 +470,7 @@ def test__delete_alias():
 
     resp = conn.delete_alias(AliasName=alias)
 
-    resp.pop('ResponseMetadata')
+    resp.pop("ResponseMetadata")
     resp.should.equal({})
 
     # we can create the alias again, since it has been deleted
@@ -480,9 +485,9 @@ def test__delete_alias__raises_if_wrong_prefix():
         conn.delete_alias(AliasName="wrongprefix/my-alias")
 
     ex = err.exception
-    ex.response['Error']['Code'].should.equal("ValidationException")
-    ex.response['Error']['Message'].should.equal("Invalid identifier")
-    ex.response['ResponseMetadata']['HTTPStatusCode'].should.equal(400)
+    ex.response["Error"]["Code"].should.equal("ValidationException")
+    ex.response["Error"]["Message"].should.equal("Invalid identifier")
+    ex.response["ResponseMetadata"]["HTTPStatusCode"].should.equal(400)
 
 
 @mock_kms
@@ -498,9 +503,9 @@ def test__delete_alias__raises_if_alias_is_not_found():
         region=region, alias_name=alias_name
     )
     ex = err.exception
-    ex.response['Error']['Code'].should.equal("NotFoundException")
-    ex.response['Error']['Message'].should.match(expected_message_match)
-    ex.response['ResponseMetadata']['HTTPStatusCode'].should.equal(400)
+    ex.response["Error"]["Code"].should.equal("NotFoundException")
+    ex.response["Error"]["Message"].should.match(expected_message_match)
+    ex.response["ResponseMetadata"]["HTTPStatusCode"].should.equal(400)
 
 
 @mock_kms

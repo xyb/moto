@@ -217,6 +217,7 @@ def test_update_stack_replace_tags():
 
 
 if not settings.TEST_SERVER_MODE:
+
     @mock_cloudformation
     def test_update_stack_when_rolled_back():
         region_name = "us-east-1"
@@ -225,7 +226,9 @@ if not settings.TEST_SERVER_MODE:
             StackName="test_stack", TemplateBody=dummy_template_json
         )["StackId"]
 
-        cloudformation_backends[region_name].stacks[stack_id].status = "ROLLBACK_COMPLETE"
+        cloudformation_backends[region_name].stacks[
+            stack_id
+        ].status = "ROLLBACK_COMPLETE"
 
         with assert_raises(ClientError) as err:
             conn.update_stack(StackName="test_stack", TemplateBody=dummy_template_json)
@@ -335,9 +338,8 @@ def test_create_stack_kinesis():
 
 def get_role_name():
     with mock_iam():
-        iam = boto3.client("iam", region_name='us-west-1')
-        role = iam.create_role(
-            AssumeRolePolicyDocument="{}",
-            RoleName="my-role",
-        )["Role"]["Arn"]
+        iam = boto3.client("iam", region_name="us-west-1")
+        role = iam.create_role(AssumeRolePolicyDocument="{}", RoleName="my-role",)[
+            "Role"
+        ]["Arn"]
         return role
