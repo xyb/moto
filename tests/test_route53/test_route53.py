@@ -1,361 +1,578 @@
 from __future__ import unicode_literals
 
-import boto
 import boto3
-from boto.route53.healthcheck import HealthCheck
-from boto.route53.record import ResourceRecordSets
+from botocore.exceptions import ClientError
 
 import sure  # noqa
 
 import uuid
 
-import botocore
 from nose.tools import assert_raises
 
-from moto import mock_route53, mock_route53_deprecated
+from moto import mock_route53
 
 
-@mock_route53_deprecated
+@mock_route53
 def test_hosted_zone():
-    conn = boto.connect_route53("the_key", "the_secret")
-    firstzone = conn.create_hosted_zone("testdns.aws.com")
-    zones = conn.get_all_hosted_zones()
-    len(zones["ListHostedZonesResponse"]["HostedZones"]).should.equal(1)
+    conn = boto3.client("route53", region_name="us-east-1")
+    firstzone = conn.create_hosted_zone(Name="testdns.aws.com", CallerReference="abcd")
+    zones = conn.list_hosted_zones()
+    len(zones["HostedZones"]).should.equal(1)
 
-    conn.create_hosted_zone("testdns1.aws.com")
-    zones = conn.get_all_hosted_zones()
-    len(zones["ListHostedZonesResponse"]["HostedZones"]).should.equal(2)
+    conn.create_hosted_zone(Name="testdns1.aws.com", CallerReference="abcd")
+    zones = conn.list_hosted_zones()
+    len(zones["HostedZones"]).should.equal(2)
 
-    id1 = firstzone["CreateHostedZoneResponse"]["HostedZone"]["Id"].split("/")[-1]
-    zone = conn.get_hosted_zone(id1)
-    zone["GetHostedZoneResponse"]["HostedZone"]["Name"].should.equal("testdns.aws.com.")
+    id1 = firstzone["HostedZone"]["Id"].split("/")[-1]
+    zone = conn.get_hosted_zone(Id=id1)
+    zone["HostedZone"]["Name"].should.equal("testdns.aws.com.")
 
-    conn.delete_hosted_zone(id1)
-    zones = conn.get_all_hosted_zones()
-    len(zones["ListHostedZonesResponse"]["HostedZones"]).should.equal(1)
+    conn.delete_hosted_zone(Id=id1)
+    zones = conn.list_hosted_zones()
+    len(zones["HostedZones"]).should.equal(1)
 
-    conn.get_hosted_zone.when.called_with("abcd").should.throw(
-        boto.route53.exception.DNSServerError, "404 Not Found"
+    conn.get_hosted_zone.when.called_with(Id="abcd").should.throw(
+        ClientError
     )
 
 
-@mock_route53_deprecated
+@mock_route53
 def test_rrset():
-    conn = boto.connect_route53("the_key", "the_secret")
+    conn = boto3.client("route53", region_name="us-east-1")
 
-    conn.get_all_rrsets.when.called_with("abcd", type="A").should.throw(
-        boto.route53.exception.DNSServerError, "404 Not Found"
+    conn.list_resource_record_sets.when.called_with(
+        HostedZoneId="abcd", StartRecordType="A"
+    ).should.throw(
+        ClientError
     )
 
-    zone = conn.create_hosted_zone("testdns.aws.com")
-    zoneid = zone["CreateHostedZoneResponse"]["HostedZone"]["Id"].split("/")[-1]
+    zone = conn.create_hosted_zone(Name="testdns.aws.com", CallerReference="abcd")
+    zoneid = zone["HostedZone"]["Id"].split("/")[-1]
 
-    changes = ResourceRecordSets(conn, zoneid)
-    change = changes.add_change("CREATE", "foo.bar.testdns.aws.com", "A")
-    change.add_value("1.2.3.4")
-    changes.commit()
+    conn.change_resource_record_sets(
+        HostedZoneId=zoneid,
+        ChangeBatch={
+            'Changes': [{
+                "Action": "CREATE",
+                "ResourceRecordSet": {
+                    "Name": "foo.bar.testdns.aws.com",
+                    "Type": "A",
+                    "ResourceRecords": [{"Value": "1.2.3.4"}]
+                }
+            }]
+        }
+    )
 
-    rrsets = conn.get_all_rrsets(zoneid, type="A")
+    rrsets = conn.list_resource_record_sets(
+        HostedZoneId=zoneid, StartRecordType="A"
+    )['ResourceRecordSets']
     rrsets.should.have.length_of(1)
-    rrsets[0].resource_records[0].should.equal("1.2.3.4")
+    rrsets[0]['ResourceRecords'][0]['Value'].should.equal("1.2.3.4")
 
-    rrsets = conn.get_all_rrsets(zoneid, type="CNAME")
+    rrsets = conn.list_resource_record_sets(
+        HostedZoneId=zoneid, StartRecordType="CNAME"
+    )['ResourceRecordSets']
     rrsets.should.have.length_of(0)
 
-    changes = ResourceRecordSets(conn, zoneid)
-    changes.add_change("DELETE", "foo.bar.testdns.aws.com", "A")
-    change = changes.add_change("CREATE", "foo.bar.testdns.aws.com", "A")
-    change.add_value("5.6.7.8")
-    changes.commit()
+    conn.change_resource_record_sets(
+        HostedZoneId=zoneid,
+        ChangeBatch={
+            'Changes': [{
+                "Action": "DELETE",
+                "ResourceRecordSet": {
+                    "Name": "foo.bar.testdns.aws.com",
+                    "Type": "A",
+                }
+            }, {
+                "Action": "CREATE",
+                "ResourceRecordSet": {
+                    "Name": "foo.bar.testdns.aws.com",
+                    "Type": "A",
+                    "ResourceRecords": [{"Value": "5.6.7.8"}]
+                }
+            }]
+        }
+    )
 
-    rrsets = conn.get_all_rrsets(zoneid, type="A")
+    rrsets = conn.list_resource_record_sets(
+        HostedZoneId=zoneid, StartRecordType="A",
+    )['ResourceRecordSets']
     rrsets.should.have.length_of(1)
-    rrsets[0].resource_records[0].should.equal("5.6.7.8")
+    rrsets[0]['ResourceRecords'][0]['Value'].should.equal("5.6.7.8")
 
-    changes = ResourceRecordSets(conn, zoneid)
-    changes.add_change("DELETE", "foo.bar.testdns.aws.com", "A")
-    changes.commit()
+    conn.change_resource_record_sets(
+        HostedZoneId=zoneid,
+        ChangeBatch={
+            'Changes': [{
+                "Action": "DELETE",
+                "ResourceRecordSet": {
+                    "Name": "foo.bar.testdns.aws.com",
+                    "Type": "A",
+                }
+            }]
+        }
+    )
 
-    rrsets = conn.get_all_rrsets(zoneid)
+    rrsets = conn.list_resource_record_sets(HostedZoneId=zoneid)['ResourceRecordSets']
     rrsets.should.have.length_of(0)
 
-    changes = ResourceRecordSets(conn, zoneid)
-    change = changes.add_change("UPSERT", "foo.bar.testdns.aws.com", "A")
-    change.add_value("1.2.3.4")
-    changes.commit()
+    conn.change_resource_record_sets(
+        HostedZoneId=zoneid,
+        ChangeBatch={
+            'Changes': [{
+                "Action": "UPSERT",
+                "ResourceRecordSet": {
+                    "Name": "foo.bar.testdns.aws.com",
+                    "Type": "A",
+                    "ResourceRecords": [{"Value": "1.2.3.4"}]
+                }
+            }]
+        }
+    )
 
-    rrsets = conn.get_all_rrsets(zoneid, type="A")
+    rrsets = conn.list_resource_record_sets(
+        HostedZoneId=zoneid, StartRecordType="A"
+    )['ResourceRecordSets']
     rrsets.should.have.length_of(1)
-    rrsets[0].resource_records[0].should.equal("1.2.3.4")
+    rrsets[0]['ResourceRecords'][0]['Value'].should.equal("1.2.3.4")
 
-    changes = ResourceRecordSets(conn, zoneid)
-    change = changes.add_change("UPSERT", "foo.bar.testdns.aws.com", "A")
-    change.add_value("5.6.7.8")
-    changes.commit()
+    conn.change_resource_record_sets(
+        HostedZoneId=zoneid,
+        ChangeBatch={
+            'Changes': [{
+                "Action": "UPSERT",
+                "ResourceRecordSet": {
+                    "Name": "foo.bar.testdns.aws.com",
+                    "Type": "A",
+                    "ResourceRecords": [{"Value": "5.6.7.8"}]
+                }
+            }]
+        }
+    )
 
-    rrsets = conn.get_all_rrsets(zoneid, type="A")
+    rrsets = conn.list_resource_record_sets(
+        HostedZoneId=zoneid, StartRecordType="A",
+    )['ResourceRecordSets']
     rrsets.should.have.length_of(1)
-    rrsets[0].resource_records[0].should.equal("5.6.7.8")
+    rrsets[0]['ResourceRecords'][0]['Value'].should.equal("5.6.7.8")
 
-    changes = ResourceRecordSets(conn, zoneid)
-    change = changes.add_change("UPSERT", "foo.bar.testdns.aws.com", "TXT")
-    change.add_value("foo")
-    changes.commit()
+    conn.change_resource_record_sets(
+        HostedZoneId=zoneid,
+        ChangeBatch={
+            'Changes': [{
+                "Action": "UPSERT",
+                "ResourceRecordSet": {
+                    "Name": "foo.bar.testdns.aws.com",
+                    "Type": "TXT",
+                    "ResourceRecords": [{"Value": "foo"}]
+                }
+            }]
+        }
+    )
 
-    rrsets = conn.get_all_rrsets(zoneid)
+    rrsets = conn.list_resource_record_sets(HostedZoneId=zoneid)['ResourceRecordSets']
     rrsets.should.have.length_of(2)
-    rrsets[0].resource_records[0].should.equal("5.6.7.8")
-    rrsets[1].resource_records[0].should.equal("foo")
+    rrsets[0]['ResourceRecords'][0]['Value'].should.equal("5.6.7.8")
+    rrsets[1]['ResourceRecords'][0]['Value'].should.equal("foo")
 
-    changes = ResourceRecordSets(conn, zoneid)
-    changes.add_change("DELETE", "foo.bar.testdns.aws.com", "A")
-    changes.add_change("DELETE", "foo.bar.testdns.aws.com", "TXT")
-    changes.commit()
+    conn.change_resource_record_sets(
+        HostedZoneId=zoneid,
+        ChangeBatch={
+            'Changes': [{
+                "Action": "DELETE",
+                "ResourceRecordSet": {
+                    "Name": "foo.bar.testdns.aws.com",
+                    "Type": "A",
+                }
+            }, {
+                "Action": "DELETE",
+                "ResourceRecordSet": {
+                    "Name": "foo.bar.testdns.aws.com",
+                    "Type": "TXT",
+                }
+            }]
+        }
+    )
 
-    changes = ResourceRecordSets(conn, zoneid)
-    change = changes.add_change("CREATE", "foo.bar.testdns.aws.com", "A")
-    change.add_value("1.2.3.4")
-    change = changes.add_change("CREATE", "bar.foo.testdns.aws.com", "A")
-    change.add_value("5.6.7.8")
-    changes.commit()
+    conn.change_resource_record_sets(
+        HostedZoneId=zoneid,
+        ChangeBatch={
+            'Changes': [{
+                "Action": "CREATE",
+                "ResourceRecordSet": {
+                    "Name": "foo.bar.testdns.aws.com",
+                    "Type": "A",
+                    "ResourceRecords": [{"Value": "1.2.3.4"}]
+                }
+            }, {
+                "Action": "CREATE",
+                "ResourceRecordSet": {
+                    "Name": "bar.foo.testdns.aws.com",
+                    "Type": "A",
+                    "ResourceRecords": [{"Value": "5.6.7.8"}]
+                }
+            }]
+        }
+    )
 
-    rrsets = conn.get_all_rrsets(zoneid, type="A")
+    rrsets = conn.list_resource_record_sets(
+        HostedZoneId=zoneid, StartRecordType="A",
+    )['ResourceRecordSets']
     rrsets.should.have.length_of(2)
 
-    rrsets = conn.get_all_rrsets(zoneid, name="bar.foo.testdns.aws.com", type="A")
+    rrsets = conn.list_resource_record_sets(
+        HostedZoneId=zoneid, StartRecordName="bar.foo.testdns.aws.com", StartRecordType="A",
+    )['ResourceRecordSets']
     rrsets.should.have.length_of(1)
-    rrsets[0].resource_records[0].should.equal("5.6.7.8")
+    rrsets[0]['ResourceRecords'][0]['Value'].should.equal("5.6.7.8")
 
-    rrsets = conn.get_all_rrsets(zoneid, name="foo.bar.testdns.aws.com", type="A")
+    rrsets = conn.list_resource_record_sets(
+        HostedZoneId=zoneid, StartRecordName="foo.bar.testdns.aws.com", StartRecordType="A",
+    )['ResourceRecordSets']
     rrsets.should.have.length_of(2)
-    resource_records = [rr for rr_set in rrsets for rr in rr_set.resource_records]
+    resource_records = [rr['Value'] for rr_set in rrsets for rr in rr_set['ResourceRecords']]
     resource_records.should.contain("1.2.3.4")
     resource_records.should.contain("5.6.7.8")
 
-    rrsets = conn.get_all_rrsets(zoneid, name="foo.foo.testdns.aws.com", type="A")
+    rrsets = conn.list_resource_record_sets(
+        HostedZoneId=zoneid, StartRecordName="foo.foo.testdns.aws.com", StartRecordType="A",
+    )['ResourceRecordSets']
     rrsets.should.have.length_of(0)
 
 
-@mock_route53_deprecated
+@mock_route53
 def test_rrset_with_multiple_values():
-    conn = boto.connect_route53("the_key", "the_secret")
-    zone = conn.create_hosted_zone("testdns.aws.com")
-    zoneid = zone["CreateHostedZoneResponse"]["HostedZone"]["Id"].split("/")[-1]
+    conn = boto3.client("route53", region_name="us-east-1")
+    zone = conn.create_hosted_zone(Name="testdns.aws.com", CallerReference="abcd")
+    zoneid = zone["HostedZone"]["Id"].split("/")[-1]
 
-    changes = ResourceRecordSets(conn, zoneid)
-    change = changes.add_change("CREATE", "foo.bar.testdns.aws.com", "A")
-    change.add_value("1.2.3.4")
-    change.add_value("5.6.7.8")
-    changes.commit()
+    conn.change_resource_record_sets(
+        HostedZoneId=zoneid,
+        ChangeBatch={
+            'Changes': [{
+                "Action": "CREATE",
+                "ResourceRecordSet": {
+                    "Name": "foo.bar.testdns.aws.com",
+                    "Type": "A",
+                    "ResourceRecords": [{"Value": "1.2.3.4"}, {"Value": "5.6.7.8"}]
+                }
+            }]
+        }
+    )
 
-    rrsets = conn.get_all_rrsets(zoneid, type="A")
+    rrsets = conn.list_resource_record_sets(HostedZoneId=zoneid, StartRecordType="A")['ResourceRecordSets']
     rrsets.should.have.length_of(1)
-    set(rrsets[0].resource_records).should.equal(set(["1.2.3.4", "5.6.7.8"]))
+    set(
+        [rr['Value'] for rr in rrsets[0]['ResourceRecords']]
+    ).should.equal(set(["1.2.3.4", "5.6.7.8"]))
 
 
-@mock_route53_deprecated
+@mock_route53
 def test_alias_rrset():
-    conn = boto.connect_route53("the_key", "the_secret")
-    zone = conn.create_hosted_zone("testdns.aws.com")
-    zoneid = zone["CreateHostedZoneResponse"]["HostedZone"]["Id"].split("/")[-1]
+    conn = boto3.client("route53", region_name="us-east-1")
+    zone = conn.create_hosted_zone(Name="testdns.aws.com", CallerReference="abcd")
+    zoneid = zone["HostedZone"]["Id"].split("/")[-1]
 
-    changes = ResourceRecordSets(conn, zoneid)
-    changes.add_change(
-        "CREATE",
-        "foo.alias.testdns.aws.com",
-        "A",
-        alias_hosted_zone_id="Z3DG6IL3SJCGPX",
-        alias_dns_name="foo.testdns.aws.com",
+    conn.change_resource_record_sets(
+        HostedZoneId=zoneid,
+        ChangeBatch={
+            'Changes': [{
+                "Action": "CREATE",
+                "ResourceRecordSet": {
+                    "Name": "foo.alias.testdns.aws.com",
+                    "Type": "A",
+                    'AliasTarget': {
+                        'HostedZoneId': 'Z3DG6IL3SJCGPX',
+                        'DNSName': 'foo.testdns.aws.com',
+                        "EvaluateTargetHealth": False,
+                    },
+                }
+            }, {
+                "Action": "CREATE",
+                "ResourceRecordSet": {
+                    "Name": "bar.alias.testdns.aws.com",
+                    "Type": "CNAME",
+                    'AliasTarget': {
+                        'HostedZoneId': 'Z3DG6IL3SJCGPX',
+                        'DNSName': 'bar.testdns.aws.com',
+                        "EvaluateTargetHealth": False,
+                    },
+                }
+            }]
+        }
     )
-    changes.add_change(
-        "CREATE",
-        "bar.alias.testdns.aws.com",
-        "CNAME",
-        alias_hosted_zone_id="Z3DG6IL3SJCGPX",
-        alias_dns_name="bar.testdns.aws.com",
-    )
-    changes.commit()
 
-    rrsets = conn.get_all_rrsets(zoneid, type="A")
-    alias_targets = [rr_set.alias_dns_name for rr_set in rrsets]
+    rrsets = conn.list_resource_record_sets(
+        HostedZoneId=zoneid, StartRecordType="A",
+    )['ResourceRecordSets']
+    alias_targets = [rr_set['AliasTarget']['DNSName'] for rr_set in rrsets]
     alias_targets.should.have.length_of(2)
     alias_targets.should.contain("foo.testdns.aws.com")
     alias_targets.should.contain("bar.testdns.aws.com")
-    rrsets[0].alias_dns_name.should.equal("foo.testdns.aws.com")
-    rrsets[0].resource_records.should.have.length_of(0)
-    rrsets = conn.get_all_rrsets(zoneid, type="CNAME")
+    rrsets[0]['AliasTarget']['DNSName'].should.equal("foo.testdns.aws.com")
+    rrsets[0].get('ResourceRecords', []).should.have.length_of(0)
+    rrsets = conn.list_resource_record_sets(
+        HostedZoneId=zoneid, StartRecordType="CNAME",
+    )['ResourceRecordSets']
     rrsets.should.have.length_of(1)
-    rrsets[0].alias_dns_name.should.equal("bar.testdns.aws.com")
-    rrsets[0].resource_records.should.have.length_of(0)
+    rrsets[0]['AliasTarget']['DNSName'].should.equal("bar.testdns.aws.com")
+    rrsets[0].get('ResourceRecords', []).should.have.length_of(0)
 
 
-@mock_route53_deprecated
+@mock_route53
 def test_create_health_check():
-    conn = boto.connect_route53("the_key", "the_secret")
+    conn = boto3.client("route53", region_name="us-east-1")
 
-    check = HealthCheck(
-        ip_addr="10.0.0.25",
-        port=80,
-        hc_type="HTTP",
-        resource_path="/",
-        fqdn="example.com",
-        string_match="a good response",
-        request_interval=10,
-        failure_threshold=2,
+    check = dict(
+        HealthCheckConfig=dict(
+            IPAddress="10.0.0.25",
+            Port=80,
+            Type="HTTP",
+            ResourcePath="/",
+            FullyQualifiedDomainName="example.com",
+            SearchString="a good response",
+            RequestInterval=10,
+            FailureThreshold=2,
+        ),
+        CallerReference="abcd",
     )
-    conn.create_health_check(check)
+    conn.create_health_check(**check)
 
-    checks = conn.get_list_health_checks()["ListHealthChecksResponse"]["HealthChecks"]
+    checks = conn.list_health_checks()["HealthChecks"]
     list(checks).should.have.length_of(1)
     check = checks[0]
     config = check["HealthCheckConfig"]
     config["IPAddress"].should.equal("10.0.0.25")
-    config["Port"].should.equal("80")
+    config["Port"].should.equal(80)
     config["Type"].should.equal("HTTP")
     config["ResourcePath"].should.equal("/")
     config["FullyQualifiedDomainName"].should.equal("example.com")
     config["SearchString"].should.equal("a good response")
-    config["RequestInterval"].should.equal("10")
-    config["FailureThreshold"].should.equal("2")
+    config["RequestInterval"].should.equal(10)
+    config["FailureThreshold"].should.equal(2)
 
 
-@mock_route53_deprecated
+@mock_route53
 def test_delete_health_check():
-    conn = boto.connect_route53("the_key", "the_secret")
+    conn = boto3.client("route53", region_name="us-east-1")
 
-    check = HealthCheck(ip_addr="10.0.0.25", port=80, hc_type="HTTP", resource_path="/")
-    conn.create_health_check(check)
+    check = dict(
+        HealthCheckConfig=dict(IPAddress="10.0.0.25", Port=80, Type="HTTP", ResourcePath="/"),
+        CallerReference="abcd",
+    )
+    conn.create_health_check(**check)
 
-    checks = conn.get_list_health_checks()["ListHealthChecksResponse"]["HealthChecks"]
+    checks = conn.list_health_checks()["HealthChecks"]
     list(checks).should.have.length_of(1)
     health_check_id = checks[0]["Id"]
 
-    conn.delete_health_check(health_check_id)
-    checks = conn.get_list_health_checks()["ListHealthChecksResponse"]["HealthChecks"]
+    conn.delete_health_check(HealthCheckId=health_check_id)
+    checks = conn.list_health_checks()["HealthChecks"]
     list(checks).should.have.length_of(0)
 
 
-@mock_route53_deprecated
+@mock_route53
 def test_use_health_check_in_resource_record_set():
-    conn = boto.connect_route53("the_key", "the_secret")
+    conn = boto3.client("route53", region_name="us-east-1")
 
-    check = HealthCheck(ip_addr="10.0.0.25", port=80, hc_type="HTTP", resource_path="/")
-    check = conn.create_health_check(check)["CreateHealthCheckResponse"]["HealthCheck"]
+    check = dict(
+        HealthCheckConfig=dict(IPAddress="10.0.0.25", Port=80, Type="HTTP", ResourcePath="/"),
+        CallerReference="abcd",
+    )
+    check = conn.create_health_check(**check)["HealthCheck"]
     check_id = check["Id"]
 
-    zone = conn.create_hosted_zone("testdns.aws.com")
-    zone_id = zone["CreateHostedZoneResponse"]["HostedZone"]["Id"].split("/")[-1]
+    zone = conn.create_hosted_zone(Name="testdns.aws.com", CallerReference="abcd")
+    zoneid = zone["HostedZone"]["Id"].split("/")[-1]
 
-    changes = ResourceRecordSets(conn, zone_id)
-    change = changes.add_change(
-        "CREATE", "foo.bar.testdns.aws.com", "A", health_check=check_id
+    conn.change_resource_record_sets(
+        HostedZoneId=zoneid,
+        ChangeBatch={
+            'Changes': [{
+                "Action": "CREATE",
+                "ResourceRecordSet": {
+                    "Name": "foo.bar.testdns.aws.com",
+                    "Type": "A",
+                    'ResourceRecords': [{"Value": "1.2.3.4"}],
+                    "HealthCheckId": check_id,
+                }
+            }]
+        }
     )
-    change.add_value("1.2.3.4")
-    changes.commit()
 
-    record_sets = conn.get_all_rrsets(zone_id)
-    record_sets[0].health_check.should.equal(check_id)
+    record_sets = conn.list_resource_record_sets(HostedZoneId=zoneid)['ResourceRecordSets']
+    record_sets[0]['HealthCheckId'].should.equal(check_id)
 
 
-@mock_route53_deprecated
+@mock_route53
 def test_hosted_zone_comment_preserved():
-    conn = boto.connect_route53("the_key", "the_secret")
-
-    firstzone = conn.create_hosted_zone("testdns.aws.com.", comment="test comment")
-    zone_id = firstzone["CreateHostedZoneResponse"]["HostedZone"]["Id"].split("/")[-1]
-
-    hosted_zone = conn.get_hosted_zone(zone_id)
-    hosted_zone["GetHostedZoneResponse"]["HostedZone"]["Config"][
-        "Comment"
-    ].should.equal("test comment")
-
-    hosted_zones = conn.get_all_hosted_zones()
-    hosted_zones["ListHostedZonesResponse"]["HostedZones"][0]["Config"][
-        "Comment"
-    ].should.equal("test comment")
-
-    zone = conn.get_zone("testdns.aws.com.")
-    zone.config["Comment"].should.equal("test comment")
-
-
-@mock_route53_deprecated
-def test_deleting_weighted_route():
-    conn = boto.connect_route53()
-
-    conn.create_hosted_zone("testdns.aws.com.")
-    zone = conn.get_zone("testdns.aws.com.")
-
-    zone.add_cname(
-        "cname.testdns.aws.com", "example.com", identifier=("success-test-foo", "50")
-    )
-    zone.add_cname(
-        "cname.testdns.aws.com", "example.com", identifier=("success-test-bar", "50")
-    )
-
-    cnames = zone.get_cname("cname.testdns.aws.com.", all=True)
-    cnames.should.have.length_of(2)
-    foo_cname = [cname for cname in cnames if cname.identifier == "success-test-foo"][0]
-
-    zone.delete_record(foo_cname)
-    cname = zone.get_cname("cname.testdns.aws.com.", all=True)
-    # When get_cname only had one result, it returns just that result instead
-    # of a list.
-    cname.identifier.should.equal("success-test-bar")
-
-
-@mock_route53_deprecated
-def test_deleting_latency_route():
-    conn = boto.connect_route53()
-
-    conn.create_hosted_zone("testdns.aws.com.")
-    zone = conn.get_zone("testdns.aws.com.")
-
-    zone.add_cname(
-        "cname.testdns.aws.com",
-        "example.com",
-        identifier=("success-test-foo", "us-west-2"),
-    )
-    zone.add_cname(
-        "cname.testdns.aws.com",
-        "example.com",
-        identifier=("success-test-bar", "us-west-1"),
-    )
-
-    cnames = zone.get_cname("cname.testdns.aws.com.", all=True)
-    cnames.should.have.length_of(2)
-    foo_cname = [cname for cname in cnames if cname.identifier == "success-test-foo"][0]
-    foo_cname.region.should.equal("us-west-2")
-
-    zone.delete_record(foo_cname)
-    cname = zone.get_cname("cname.testdns.aws.com.", all=True)
-    # When get_cname only had one result, it returns just that result instead
-    # of a list.
-    cname.identifier.should.equal("success-test-bar")
-    cname.region.should.equal("us-west-1")
-
-
-@mock_route53_deprecated
-def test_hosted_zone_private_zone_preserved():
-    conn = boto.connect_route53("the_key", "the_secret")
+    conn = boto3.client("route53", region_name="us-east-1")
 
     firstzone = conn.create_hosted_zone(
-        "testdns.aws.com.", private_zone=True, vpc_id="vpc-fake", vpc_region="us-east-1"
+        Name="testdns.aws.com.",
+        HostedZoneConfig={"Comment": "test comment"},
+        CallerReference="abcd",
     )
-    zone_id = firstzone["CreateHostedZoneResponse"]["HostedZone"]["Id"].split("/")[-1]
+    zone_id = firstzone["HostedZone"]["Id"].split("/")[-1]
 
-    hosted_zone = conn.get_hosted_zone(zone_id)
+    hosted_zone = [zone for zone in conn.list_hosted_zones()['HostedZones']
+        if zone['Name'] == "testdns.aws.com."][0]
+    hosted_zone["Config"]["Comment"].should.equal("test comment")
+
+
+@mock_route53
+def test_deleting_weighted_route():
+    conn = boto3.client("route53", region_name="us-east-1")
+
+    firstzone = conn.create_hosted_zone(Name="testdns.aws.com.", CallerReference="abcd")
+    zone_id = firstzone["HostedZone"]["Id"].split("/")[-1]
+
+    conn.change_resource_record_sets(
+        HostedZoneId=zone_id,
+        ChangeBatch={
+            'Changes': [{
+                "Action": "CREATE",
+                "ResourceRecordSet": {
+                    "Name": "cname.testdns.aws.com",
+                    "Type": "CNAME",
+                    'ResourceRecords': [{"Value": "example.com"}],
+                    "SetIdentifier": "success-test-foo",
+                    "Weight": 50,
+                }
+            }, {
+                "Action": "CREATE",
+                "ResourceRecordSet": {
+                    "Name": "cname.testdns.aws.com",
+                    "Type": "CNAME",
+                    'ResourceRecords': [{"Value": "example.com"}],
+                    "SetIdentifier": "success-test-bar",
+                    "Weight": 50,
+                }
+            }]
+        }
+    )
+
+    cnames = conn.list_resource_record_sets(
+        HostedZoneId=zone_id,
+        StartRecordName="cname.testdns.aws.com.",
+    )['ResourceRecordSets']
+    cnames.should.have.length_of(2)
+    foo_cname = [cname for cname in cnames if cname['SetIdentifier'] == "success-test-foo"][0]
+
+    conn.change_resource_record_sets(
+        HostedZoneId=zone_id,
+        ChangeBatch={
+            'Changes': [{
+                "Action": "DELETE",
+                "ResourceRecordSet": {
+                    "Name": "cname.testdns.aws.com",
+                    "Type": "CNAME",
+                    'ResourceRecords': [{"Value": "example.com"}],
+                    "SetIdentifier": "success-test-foo",
+                }
+            }]
+        }
+    )
+
+    cnames = conn.list_resource_record_sets(
+        HostedZoneId=zone_id,
+        StartRecordName="cname.testdns.aws.com.",
+    )['ResourceRecordSets']
+    cnames.should.have.length_of(1)
+    cnames[0]['SetIdentifier'].should.equal("success-test-bar")
+
+
+@mock_route53
+def test_deleting_latency_route():
+    conn = boto3.client("route53", region_name="us-east-1")
+
+    conn.create_hosted_zone(Name="testdns.aws.com.", CallerReference="abcd")
+    zone = [zone for zone in conn.list_hosted_zones()['HostedZones']
+        if zone['Name'] == "testdns.aws.com."][0]
+    zone_id = zone['Id']
+
+    conn.change_resource_record_sets(
+        HostedZoneId=zone_id,
+        ChangeBatch={
+            'Changes': [{
+                "Action": "CREATE",
+                "ResourceRecordSet": {
+                    "Name": "cname.testdns.aws.com",
+                    "Type": "CNAME",
+                    'ResourceRecords': [{"Value": "example.com"}],
+                    "SetIdentifier": "success-test-foo",
+                    "Region": "us-west-2",
+                }
+            }, {
+                "Action": "CREATE",
+                "ResourceRecordSet": {
+                    "Name": "cname.testdns.aws.com",
+                    "Type": "CNAME",
+                    'ResourceRecords': [{"Value": "example.com"}],
+                    "SetIdentifier": "success-test-bar",
+                    "Region": "us-west-1",
+                }
+            }]
+        }
+    )
+
+    cnames = conn.list_resource_record_sets(
+        HostedZoneId=zone_id,
+        StartRecordName="cname.testdns.aws.com.",
+    )['ResourceRecordSets']
+    cnames.should.have.length_of(2)
+    foo_cname = [cname for cname in cnames if cname['SetIdentifier'] == "success-test-foo"][0]
+    foo_cname['Region'].should.equal("us-west-2")
+
+    conn.change_resource_record_sets(
+        HostedZoneId=zone_id,
+        ChangeBatch={
+            'Changes': [{
+                "Action": "DELETE",
+                "ResourceRecordSet": {
+                    "Name": "cname.testdns.aws.com",
+                    "Type": "CNAME",
+                    "SetIdentifier": "success-test-foo",
+                    "Region": "us-west-2",
+                }
+            }]
+        }
+    )
+
+    cnames = conn.list_resource_record_sets(
+        HostedZoneId=zone_id,
+        StartRecordName="cname.testdns.aws.com.",
+    )['ResourceRecordSets']
+    cnames.should.have.length_of(1)
+    cname = cnames[0]
+    cname['SetIdentifier'].should.equal("success-test-bar")
+    cname['Region'].should.equal("us-west-1")
+
+
+@mock_route53
+def test_hosted_zone_private_zone_preserved():
+    conn = boto3.client("route53", region_name="us-east-1")
+
+    firstzone = conn.create_hosted_zone(
+        Name="testdns.aws.com.",
+        HostedZoneConfig=dict(
+            PrivateZone=True,
+            Comment="some comment",
+        ),
+        VPC=dict(
+            VPCId="vpc-fake",
+            VPCRegion="us-east-1",
+        ),
+        CallerReference="abcd",
+    )
+    zone_id = firstzone["HostedZone"]["Id"].split("/")[-1]
+
+    hosted_zone = conn.list_hosted_zones()['HostedZones'][0]
     # in (original) boto, these bools returned as strings.
-    hosted_zone["GetHostedZoneResponse"]["HostedZone"]["Config"][
-        "PrivateZone"
-    ].should.equal("True")
+    hosted_zone["Config"]["PrivateZone"].should.equal(True)
 
-    hosted_zones = conn.get_all_hosted_zones()
-    hosted_zones["ListHostedZonesResponse"]["HostedZones"][0]["Config"][
-        "PrivateZone"
-    ].should.equal("True")
-
-    zone = conn.get_zone("testdns.aws.com.")
-    zone.config["PrivateZone"].should.equal("True")
+    hosted_zones = conn.list_hosted_zones()
+    hosted_zones["HostedZones"][0]["Config"]["PrivateZone"].should.equal(True)
 
 
 @mock_route53
@@ -855,7 +1072,7 @@ def test_change_resource_record_invalid():
         ],
     }
 
-    with assert_raises(botocore.exceptions.ClientError):
+    with assert_raises(ClientError):
         conn.change_resource_record_sets(
             HostedZoneId=hosted_zone_id, ChangeBatch=invalid_a_record_payload
         )
@@ -878,7 +1095,7 @@ def test_change_resource_record_invalid():
         ],
     }
 
-    with assert_raises(botocore.exceptions.ClientError):
+    with assert_raises(ClientError):
         conn.change_resource_record_sets(
             HostedZoneId=hosted_zone_id, ChangeBatch=invalid_cname_record_payload
         )

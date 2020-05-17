@@ -63,8 +63,12 @@ class HealthCheck(BaseModel):
                 <Type>{{ health_check.type_ }}</Type>
                 <ResourcePath>{{ health_check.resource_path }}</ResourcePath>
                 <FullyQualifiedDomainName>{{ health_check.fqdn }}</FullyQualifiedDomainName>
-                <RequestInterval>{{ health_check.request_interval }}</RequestInterval>
-                <FailureThreshold>{{ health_check.failure_threshold }}</FailureThreshold>
+                {% if health_check.request_interval %}
+                    <RequestInterval>{{ health_check.request_interval }}</RequestInterval>
+                {% endif %}
+                {% if health_check.failure_threshold %}
+                    <FailureThreshold>{{ health_check.failure_threshold }}</FailureThreshold>
+                {% endif %}
                 {% if health_check.search_string %}
                     <SearchString>{{ health_check.search_string }}</SearchString>
                 {% endif %}

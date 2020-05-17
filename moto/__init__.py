@@ -66,7 +66,6 @@ mock_resourcegroupstaggingapi = lazy_load(
     ".resourcegroupstaggingapi", "mock_resourcegroupstaggingapi"
 )
 mock_route53 = lazy_load(".route53", "mock_route53")
-mock_route53_deprecated = lazy_load(".route53", "mock_route53_deprecated")
 mock_s3 = lazy_load(".s3", "mock_s3")
 mock_s3_deprecated = lazy_load(".s3", "mock_s3_deprecated")
 mock_secretsmanager = lazy_load(".secretsmanager", "mock_secretsmanager")
