@@ -641,7 +641,7 @@ DESCRIBE_ATTRIBUTES_TEMPLATE = """<DescribeLoadBalancerAttributesResponse  xmlns
         <IdleTimeout>{{ attributes.connecting_settings.idle_timeout }}</IdleTimeout>
       </ConnectionSettings>
       <CrossZoneLoadBalancing>
-        <Enabled>{{ attributes.cross_zone_load_balancing.enabled }}</Enabled>
+        <Enabled>{{ attributes.cross_zone_load_balancing.enabled | string | lower }}</Enabled>
       </CrossZoneLoadBalancing>
       <ConnectionDraining>
         {% if attributes.connection_draining.enabled %}

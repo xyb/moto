@@ -408,7 +408,7 @@ def test_create_health_check_boto3():
 @mock_ec2
 @mock_elb
 def test_register_instances():
-    ec2_conn = boto3.client("ec2")
+    ec2_conn = boto3.client("ec2", region_name="us-east-1")
     reservation = ec2_conn.run_instances(ImageId="ami-1234abcd", MaxCount=2, MinCount=2)
     instance_id1 = reservation['Instances'][0]['InstanceId']
     instance_id2 = reservation['Instances'][1]['InstanceId']
@@ -436,7 +436,7 @@ def test_register_instances():
 def test_register_instances_boto3():
     ec2 = boto3.resource("ec2", region_name="us-east-1")
     response = ec2.create_instances(ImageId="ami-1234abcd", MinCount=2, MaxCount=2)
-    instance_id1 = response[0]['InstanceId']
+    instance_id1 = response[0].id
     instance_id2 = response[1].id
 
     client = boto3.client("elb", region_name="us-east-1")
@@ -457,7 +457,7 @@ def test_register_instances_boto3():
 @mock_ec2
 @mock_elb
 def test_deregister_instances():
-    ec2_conn = boto3.client("ec2")
+    ec2_conn = boto3.client("ec2", region_name="us-east-1")
     reservation = ec2_conn.run_instances(ImageId="ami-1234abcd", MinCount=2, MaxCount=2)
     instance_id1 = reservation['Instances'][0]['InstanceId']
     instance_id2 = reservation['Instances'][1]['InstanceId']
@@ -492,7 +492,7 @@ def test_deregister_instances():
 def test_deregister_instances_boto3():
     ec2 = boto3.resource("ec2", region_name="us-east-1")
     response = ec2.create_instances(ImageId="ami-1234abcd", MinCount=2, MaxCount=2)
-    instance_id1 = response[0]['InstanceId']
+    instance_id1 = response[0].id
     instance_id2 = response[1].id
 
     client = boto3.client("elb", region_name="us-east-1")
@@ -833,7 +833,7 @@ def test_set_policies_of_backend_server():
 @mock_ec2
 @mock_elb
 def test_describe_instance_health():
-    ec2_conn = boto3.client("ec2")
+    ec2_conn = boto3.client("ec2", region_name="us-east-1")
     reservation = ec2_conn.run_instances(ImageId="ami-1234abcd", MinCount=2, MaxCount=2)
     instance_id1 = reservation['Instances'][0]['InstanceId']
     instance_id2 = reservation['Instances'][1]['InstanceId']
