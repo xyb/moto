@@ -101,7 +101,6 @@ class Message(BaseModel):
             if data_type == "String" or data_type == "Number":
                 value = attr["string_value"]
             elif data_type == "Binary":
-                print(data_type, attr["binary_value"], type(attr["binary_value"]))
                 value = base64.b64decode(attr["binary_value"])
             else:
                 print(

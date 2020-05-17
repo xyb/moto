@@ -603,7 +603,7 @@ def test_receive_messages_with_wait_seconds_timeout_of_zero():
 
 @mock_sqs
 def test_send_message_with_xml_characters():
-    conn = boto3.client("sqs")
+    conn = boto3.client("sqs", region_name="us-east-1")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "3"}
     )["QueueUrl"]
@@ -621,7 +621,7 @@ def test_send_message_with_xml_characters():
 
 @mock_sqs
 def test_send_message_with_attributes():
-    conn = boto3.client("sqs")
+    conn = boto3.client("sqs", region_name="us-east-1")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "3"}
     )["QueueUrl"]
@@ -658,7 +658,7 @@ def queue_size(conn, queue_url):
 
 @mock_sqs
 def test_send_message_with_delay():
-    conn = boto3.client("sqs")
+    conn = boto3.client("sqs", region_name="us-east-1")
     sqs = boto3.resource("sqs")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "3"}
@@ -684,7 +684,7 @@ def test_send_message_with_delay():
 
 @mock_sqs
 def test_send_large_message_fails():
-    conn = boto3.client("sqs")
+    conn = boto3.client("sqs", region_name="us-east-1")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "3"}
     )["QueueUrl"]
@@ -698,7 +698,7 @@ def test_send_large_message_fails():
 
 @mock_sqs
 def test_message_becomes_inflight_when_received():
-    conn = boto3.client("sqs")
+    conn = boto3.client("sqs", region_name="us-east-1")
     sqs = boto3.resource("sqs")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "2"}
@@ -725,7 +725,7 @@ def test_message_becomes_inflight_when_received():
 
 @mock_sqs
 def test_receive_message_with_explicit_visibility_timeout():
-    conn = boto3.client("sqs")
+    conn = boto3.client("sqs", region_name="us-east-1")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "3"}
     )["QueueUrl"]
@@ -746,7 +746,7 @@ def test_receive_message_with_explicit_visibility_timeout():
 
 @mock_sqs
 def test_change_message_visibility():
-    conn = boto3.client("sqs")
+    conn = boto3.client("sqs", region_name="us-east-1")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "2"}
     )["QueueUrl"]
@@ -790,7 +790,7 @@ def test_change_message_visibility():
 
 @mock_sqs
 def test_message_attributes():
-    conn = boto3.client("sqs")
+    conn = boto3.client("sqs", region_name="us-east-1")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "2"}
     )["QueueUrl"]
@@ -817,7 +817,7 @@ def test_message_attributes():
 
 @mock_sqs
 def test_read_message_from_queue():
-    conn = boto3.client("sqs")
+    conn = boto3.client("sqs", region_name="us-east-1")
     queue_url = conn.create_queue(QueueName="testqueue")["QueueUrl"]
 
     body = "foo bar baz"
@@ -830,7 +830,7 @@ def test_read_message_from_queue():
 
 @mock_sqs
 def test_queue_length():
-    conn = boto3.client("sqs")
+    conn = boto3.client("sqs", region_name="us-east-1")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "3"}
     )["QueueUrl"]
@@ -843,7 +843,7 @@ def test_queue_length():
 
 @mock_sqs
 def test_delete_message():
-    conn = boto3.client("sqs")
+    conn = boto3.client("sqs", region_name="us-east-1")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "3"}
     )["QueueUrl"]
@@ -869,7 +869,7 @@ def test_delete_message():
 
 @mock_sqs
 def test_send_batch_operation():
-    conn = boto3.client("sqs")
+    conn = boto3.client("sqs", region_name="us-east-1")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "3"}
     )["QueueUrl"]
@@ -894,7 +894,7 @@ def test_send_batch_operation():
 
 @mock_sqs
 def test_send_batch_operation_with_message_attributes():
-    conn = boto3.client("sqs")
+    conn = boto3.client("sqs", region_name="us-east-1")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "3"}
     )["QueueUrl"]
@@ -917,7 +917,7 @@ def test_send_batch_operation_with_message_attributes():
 
 @mock_sqs
 def test_delete_batch_operation():
-    conn = boto3.client("sqs")
+    conn = boto3.client("sqs", region_name="us-east-1")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "3"}
     )["QueueUrl"]
@@ -948,7 +948,7 @@ def test_delete_batch_operation():
 
 @mock_sqs
 def test_queue_attributes():
-    conn = boto3.client("sqs")
+    conn = boto3.client("sqs", region_name="us-east-1")
 
     queue_name = "test-queue"
     visibility_timeout = "3"
@@ -983,7 +983,7 @@ def test_queue_attributes():
 
 @mock_sqs
 def test_change_message_visibility_on_invalid_receipt():
-    conn = boto3.client("sqs")
+    conn = boto3.client("sqs", region_name="us-east-1")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "1"}
     )["QueueUrl"]
@@ -1019,7 +1019,7 @@ def test_change_message_visibility_on_invalid_receipt():
 
 @mock_sqs
 def test_change_message_visibility_on_visible_message():
-    conn = boto3.client("sqs")
+    conn = boto3.client("sqs", region_name="us-east-1")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "1"}
     )["QueueUrl"]

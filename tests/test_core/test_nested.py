@@ -13,8 +13,8 @@ from moto import mock_sqs, mock_ec2
 class TestNestedDecorators(unittest.TestCase):
     @mock_sqs
     def setup_sqs_queue(self):
-        conn = boto3.client("sqs")
-        sqs = boto3.resource("sqs")
+        conn = boto3.client("sqs", region_name="us-west-1")
+        sqs = boto3.resource("sqs", region_name="us-west-1")
         queue = sqs.create_queue(QueueName="some-queue")
         msg = queue.send_message(MessageBody="This is my first message.")
 
@@ -28,5 +28,5 @@ class TestNestedDecorators(unittest.TestCase):
     def test_nested(self):
         self.setup_sqs_queue()
 
-        conn = boto3.client("ec2")
+        conn = boto3.client("ec2", region_name="us-west-1")
         conn.run_instances(ImageId="ami-123456", MaxCount=1, MinCount=1)
