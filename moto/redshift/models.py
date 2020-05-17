@@ -626,8 +626,7 @@ class RedshiftBackend(BaseBackend):
                 cluster_skip_final_snapshot is False
                 and cluster_snapshot_identifer is None
             ):
-                raise ClientError(
-                    "InvalidParameterValue",
+                raise InvalidParameterValueError(
                     "FinalSnapshotIdentifier is required for Snapshot copy "
                     "when SkipFinalSnapshot is False",
                 )

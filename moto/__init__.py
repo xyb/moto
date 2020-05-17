@@ -64,7 +64,6 @@ mock_rds = lazy_load(".rds", "mock_rds")
 mock_rds_deprecated = lazy_load(".rds", "mock_rds_deprecated")
 mock_rds2 = lazy_load(".rds2", "mock_rds2")
 mock_redshift = lazy_load(".redshift", "mock_redshift")
-mock_redshift_deprecated = lazy_load(".redshift", "mock_redshift_deprecated")
 mock_resourcegroups = lazy_load(".resourcegroups", "mock_resourcegroups")
 mock_resourcegroupstaggingapi = lazy_load(
     ".resourcegroupstaggingapi", "mock_resourcegroupstaggingapi"
