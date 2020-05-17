@@ -27,9 +27,6 @@ mock_cognitoidentity = lazy_load(".cognitoidentity", "mock_cognitoidentity")
 mock_cognitoidp = lazy_load(".cognitoidp", "mock_cognitoidp")
 mock_config = lazy_load(".config", "mock_config")
 mock_datapipeline = lazy_load(".datapipeline", "mock_datapipeline")
-mock_datapipeline_deprecated = lazy_load(
-    ".datapipeline", "mock_datapipeline_deprecated"
-)
 mock_datasync = lazy_load(".datasync", "mock_datasync")
 mock_dynamodb = lazy_load(".dynamodb", "mock_dynamodb")
 mock_dynamodb_deprecated = lazy_load(".dynamodb", "mock_dynamodb_deprecated")
