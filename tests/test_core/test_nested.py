@@ -1,28 +1,33 @@
 from __future__ import unicode_literals
 import unittest
+import sure
 
+import boto3
 from boto.sqs.connection import SQSConnection
 from boto.sqs.message import Message
 from boto.ec2 import EC2Connection
 
-from moto import mock_sqs_deprecated, mock_ec2_deprecated
+from moto import mock_sqs, mock_ec2
 
 
 class TestNestedDecorators(unittest.TestCase):
-    @mock_sqs_deprecated
+    @mock_sqs
     def setup_sqs_queue(self):
-        conn = SQSConnection()
-        q = conn.create_queue("some-queue")
+        conn = boto3.client("sqs")
+        sqs = boto3.resource("sqs")
+        queue = sqs.create_queue(QueueName="some-queue")
+        msg = queue.send_message(MessageBody="This is my first message.")
 
-        m = Message()
-        m.set_body("This is my first message.")
-        q.write(m)
+        int(conn.get_queue_attributes(
+                QueueUrl=queue.url,
+                AttributeNames=['ApproximateNumberOfMessages']
+            )['Attributes']['ApproximateNumberOfMessages']
+        ).should.equal(1)
 
-        self.assertEqual(q.count(), 1)
 
-    @mock_ec2_deprecated
+    @mock_ec2
     def test_nested(self):
         self.setup_sqs_queue()
 
-        conn = EC2Connection()
-        conn.run_instances("ami-123456")
+        conn = boto3.client("ec2")
+        conn.run_instances(ImageId="ami-123456", MaxCount=1, MinCount=1)

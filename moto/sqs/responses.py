@@ -124,11 +124,11 @@ class SQSResponse(BaseResponse):
                 visibility_timeout=visibility_timeout,
             )
         except MessageNotInflight as e:
-            return (
-                "Invalid request: {0}".format(e.description),
-                dict(status=e.status_code),
+            return self._error(
+                code="MessageNotInflight",
+                message="Invalid request: {0}".format(e.description),
+                status=e.status_code,
             )
-
         template = self.response_template(CHANGE_MESSAGE_VISIBILITY_RESPONSE)
         return template.render()
 
