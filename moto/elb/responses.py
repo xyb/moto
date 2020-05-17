@@ -216,7 +216,9 @@ class ELBResponse(BaseResponse):
 
         self.elb_backend.create_app_cookie_stickiness_policy(load_balancer_name, policy)
 
-        template = self.response_template(CREATE_LOAD_BALANCER_APP_COOKIE_POLICY_TEMPLATE)
+        template = self.response_template(
+            CREATE_LOAD_BALANCER_APP_COOKIE_POLICY_TEMPLATE
+        )
         return template.render()
 
     def create_lb_cookie_stickiness_policy(self):
@@ -232,7 +234,9 @@ class ELBResponse(BaseResponse):
 
         self.elb_backend.create_lb_cookie_stickiness_policy(load_balancer_name, policy)
 
-        template = self.response_template(CREATE_LOAD_BALANCER_COOKIE_STICKINESS_POLICY_TEMPLATE)
+        template = self.response_template(
+            CREATE_LOAD_BALANCER_COOKIE_STICKINESS_POLICY_TEMPLATE
+        )
         return template.render()
 
     def set_load_balancer_policies_of_listener(self):

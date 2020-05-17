@@ -393,6 +393,7 @@ def test_set_desired_capacity_the_same():
     instances = list(conn.get_all_autoscaling_instances())
     instances.should.have.length_of(2)
 
+
 """
 Boto3
 """

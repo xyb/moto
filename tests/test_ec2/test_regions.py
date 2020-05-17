@@ -69,12 +69,14 @@ def test_add_servers_to_multiple_regions():
 def test_create_autoscaling_groups_in_different_regions():
     elb_conn = boto3.client("elb", region_name="us-east-1")
     elb_conn.create_load_balancer(
-        LoadBalancerName="us_test_lb", AvailabilityZones=[],
+        LoadBalancerName="us_test_lb",
+        AvailabilityZones=[],
         Listeners=[{"LoadBalancerPort": 80, "InstancePort": 8080, "Protocol": "http"}],
     )
     elb_conn = boto3.client("elb", region_name="ap-northeast-1")
     elb_conn.create_load_balancer(
-        LoadBalancerName="ap_test_lb", AvailabilityZones=[],
+        LoadBalancerName="ap_test_lb",
+        AvailabilityZones=[],
         Listeners=[{"LoadBalancerPort": 80, "InstancePort": 8080, "Protocol": "http"}],
     )
 
@@ -122,21 +124,21 @@ def test_create_autoscaling_groups_in_different_regions():
     }
     ap_conn.create_auto_scaling_group(**group)
 
-    len(us_conn.describe_auto_scaling_groups()['AutoScalingGroups']).should.equal(1)
-    len(ap_conn.describe_auto_scaling_groups()['AutoScalingGroups']).should.equal(1)
+    len(us_conn.describe_auto_scaling_groups()["AutoScalingGroups"]).should.equal(1)
+    len(ap_conn.describe_auto_scaling_groups()["AutoScalingGroups"]).should.equal(1)
 
-    us_group = us_conn.describe_auto_scaling_groups()['AutoScalingGroups'][0]
-    us_group['AutoScalingGroupName'].should.equal("us_tester_group")
-    list(us_group['AvailabilityZones']).should.equal(["us-east-1c"])
-    us_group['VPCZoneIdentifier'].should.equal(us_subnet_id)
-    us_group['LaunchConfigurationName'].should.equal("us_tester")
-    list(us_group['LoadBalancerNames']).should.equal(["us_test_lb"])
-    us_group['PlacementGroup'].should.equal("us_test_placement")
+    us_group = us_conn.describe_auto_scaling_groups()["AutoScalingGroups"][0]
+    us_group["AutoScalingGroupName"].should.equal("us_tester_group")
+    list(us_group["AvailabilityZones"]).should.equal(["us-east-1c"])
+    us_group["VPCZoneIdentifier"].should.equal(us_subnet_id)
+    us_group["LaunchConfigurationName"].should.equal("us_tester")
+    list(us_group["LoadBalancerNames"]).should.equal(["us_test_lb"])
+    us_group["PlacementGroup"].should.equal("us_test_placement")
 
-    ap_group = ap_conn.describe_auto_scaling_groups()['AutoScalingGroups'][0]
-    ap_group['AutoScalingGroupName'].should.equal("ap_tester_group")
-    list(ap_group['AvailabilityZones']).should.equal(["ap-northeast-1a"])
-    ap_group['VPCZoneIdentifier'].should.equal(ap_subnet_id)
-    ap_group['LaunchConfigurationName'].should.equal("ap_tester")
-    list(ap_group['LoadBalancerNames']).should.equal(["ap_test_lb"])
-    ap_group['PlacementGroup'].should.equal("ap_test_placement")
+    ap_group = ap_conn.describe_auto_scaling_groups()["AutoScalingGroups"][0]
+    ap_group["AutoScalingGroupName"].should.equal("ap_tester_group")
+    list(ap_group["AvailabilityZones"]).should.equal(["ap-northeast-1a"])
+    ap_group["VPCZoneIdentifier"].should.equal(ap_subnet_id)
+    ap_group["LaunchConfigurationName"].should.equal("ap_tester")
+    list(ap_group["LoadBalancerNames"]).should.equal(["ap_test_lb"])
+    ap_group["PlacementGroup"].should.equal("ap_test_placement")

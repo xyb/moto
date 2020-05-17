@@ -265,13 +265,7 @@ class ELBBackend(BaseBackend):
         self.__init__(region_name)
 
     def create_load_balancer(
-        self,
-        name,
-        zones,
-        ports,
-        scheme=None,
-        subnets=None,
-        security_groups=None,
+        self, name, zones, ports, scheme=None, subnets=None, security_groups=None,
     ):
         vpc_id = None
         ec2_backend = ec2_backends[self.region_name]

@@ -45,7 +45,7 @@ def test_create_cluster():
     )
     response["Cluster"]["EnhancedVpcRouting"].should.equal(False)
 
-    cluster_response = conn.describe_clusters(ClusterIdentifier="test")['Clusters']
+    cluster_response = conn.describe_clusters(ClusterIdentifier="test")["Clusters"]
     cluster = cluster_response[0]
 
     cluster["ClusterIdentifier"].should.equal("test")
@@ -139,7 +139,9 @@ def test_create_single_node_cluster():
         ClusterType="single-node",
     )
 
-    cluster_response = conn.describe_clusters(ClusterIdentifier=cluster_identifier)['Clusters']
+    cluster_response = conn.describe_clusters(ClusterIdentifier=cluster_identifier)[
+        "Clusters"
+    ]
     cluster = cluster_response[0]
 
     cluster["ClusterIdentifier"].should.equal(cluster_identifier)
@@ -161,7 +163,9 @@ def test_default_cluster_attributes():
         MasterUserPassword="password",
     )
 
-    cluster_response = conn.describe_clusters(ClusterIdentifier=cluster_identifier)['Clusters']
+    cluster_response = conn.describe_clusters(ClusterIdentifier=cluster_identifier)[
+        "Clusters"
+    ]
     cluster = cluster_response[0]
 
     cluster["DBName"].should.equal("dev")
@@ -233,10 +237,14 @@ def test_create_cluster_in_subnet_group_boto3():
 @mock_redshift
 def test_create_cluster_with_security_group():
     conn = boto3.client("redshift", region_name="us-east-1")
-    conn.create_cluster_security_group(ClusterSecurityGroupName="security_group1",
-        Description="This is my security group")
-    conn.create_cluster_security_group(ClusterSecurityGroupName="security_group2",
-        Description="This is my security group")
+    conn.create_cluster_security_group(
+        ClusterSecurityGroupName="security_group1",
+        Description="This is my security group",
+    )
+    conn.create_cluster_security_group(
+        ClusterSecurityGroupName="security_group2",
+        Description="This is my security group",
+    )
 
     cluster_identifier = "my_cluster"
     conn.create_cluster(
@@ -247,7 +255,9 @@ def test_create_cluster_with_security_group():
         ClusterSecurityGroups=["security_group1", "security_group2"],
     )
 
-    cluster_response = conn.describe_clusters(ClusterIdentifier=cluster_identifier)['Clusters']
+    cluster_response = conn.describe_clusters(ClusterIdentifier=cluster_identifier)[
+        "Clusters"
+    ]
     cluster = cluster_response[0]
     group_names = [
         group["ClusterSecurityGroupName"] for group in cluster["ClusterSecurityGroups"]
@@ -341,17 +351,21 @@ def test_create_cluster_with_parameter_group():
         ClusterParameterGroupName="my_parameter_group",
     )
 
-    cluster_response = conn.describe_clusters(ClusterIdentifier="my_cluster")['Clusters']
+    cluster_response = conn.describe_clusters(ClusterIdentifier="my_cluster")[
+        "Clusters"
+    ]
     cluster = cluster_response[0]
-    cluster['ClusterParameterGroups'][0]['ParameterGroupName'].should.equal("my_parameter_group")
+    cluster["ClusterParameterGroups"][0]["ParameterGroupName"].should.equal(
+        "my_parameter_group"
+    )
 
 
 @mock_redshift
 def test_describe_non_existent_cluster():
     conn = boto3.client("redshift", region_name="us-east-1")
-    conn.describe_clusters.when.called_with(ClusterIdentifier="not-a-cluster").should.throw(
-        ClientError
-    )
+    conn.describe_clusters.when.called_with(
+        ClusterIdentifier="not-a-cluster"
+    ).should.throw(ClientError)
 
 
 @mock_redshift
@@ -368,11 +382,8 @@ def test_delete_cluster():
     )
 
     conn.delete_cluster.when.called_with(
-        ClusterIdentifier=cluster_identifier,
-        SkipFinalClusterSnapshot=False,
-    ).should.throw(
-        ClientError
-    )
+        ClusterIdentifier=cluster_identifier, SkipFinalClusterSnapshot=False,
+    ).should.throw(ClientError)
 
     clusters = conn.describe_clusters()["Clusters"]
     list(clusters).should.have.length_of(1)
@@ -456,8 +467,10 @@ def test_modify_cluster_vpc_routing():
 def test_modify_cluster():
     conn = boto3.client("redshift", region_name="us-east-1")
     cluster_identifier = "my_cluster"
-    conn.create_cluster_security_group(ClusterSecurityGroupName="security_group",
-        Description="This is my security group")
+    conn.create_cluster_security_group(
+        ClusterSecurityGroupName="security_group",
+        Description="This is my security group",
+    )
     conn.create_cluster_parameter_group(
         ParameterGroupName="my_parameter_group",
         ParameterGroupFamily="redshift-1.0",
@@ -471,7 +484,9 @@ def test_modify_cluster():
         MasterUserPassword="password",
     )
 
-    cluster_response = conn.describe_clusters(ClusterIdentifier=cluster_identifier)['Clusters']
+    cluster_response = conn.describe_clusters(ClusterIdentifier=cluster_identifier)[
+        "Clusters"
+    ]
     cluster = cluster_response[0]
     cluster["EnhancedVpcRouting"].should.equal(False)
 
@@ -488,7 +503,9 @@ def test_modify_cluster():
         NewClusterIdentifier=cluster_identifier,
     )
 
-    cluster_response = conn.describe_clusters(ClusterIdentifier=cluster_identifier)['Clusters']
+    cluster_response = conn.describe_clusters(ClusterIdentifier=cluster_identifier)[
+        "Clusters"
+    ]
     cluster = cluster_response[0]
     cluster["ClusterIdentifier"].should.equal(cluster_identifier)
     cluster["NodeType"].should.equal("dw.hs1.xlarge")
@@ -583,10 +600,14 @@ def test_delete_cluster_subnet_group():
 @mock_redshift
 def test_create_cluster_security_group():
     conn = boto3.client("redshift", region_name="us-east-1")
-    conn.create_cluster_security_group(ClusterSecurityGroupName="my_security_group",
-        Description="This is my security group")
+    conn.create_cluster_security_group(
+        ClusterSecurityGroupName="my_security_group",
+        Description="This is my security group",
+    )
 
-    groups_response = conn.describe_cluster_security_groups(ClusterSecurityGroupName="my_security_group")
+    groups_response = conn.describe_cluster_security_groups(
+        ClusterSecurityGroupName="my_security_group"
+    )
     my_group = groups_response["ClusterSecurityGroups"][0]
 
     my_group["ClusterSecurityGroupName"].should.equal("my_security_group")
@@ -605,8 +626,10 @@ def test_describe_non_existent_security_group():
 @mock_redshift
 def test_delete_cluster_security_group():
     conn = boto3.client("redshift", region_name="us-east-1")
-    conn.create_cluster_security_group(ClusterSecurityGroupName="my_security_group",
-        Description="This is my security group")
+    conn.create_cluster_security_group(
+        ClusterSecurityGroupName="my_security_group",
+        Description="This is my security group",
+    )
 
     groups_response = conn.describe_cluster_security_groups()
     groups = groups_response["ClusterSecurityGroups"]
@@ -634,7 +657,8 @@ def test_create_cluster_parameter_group():
     )
 
     groups_response = conn.describe_cluster_parameter_groups(
-        ParameterGroupName="my_parameter_group")['ParameterGroups']
+        ParameterGroupName="my_parameter_group"
+    )["ParameterGroups"]
     my_group = groups_response[0]
 
     my_group["ParameterGroupName"].should.equal("my_parameter_group")
@@ -659,12 +683,12 @@ def test_delete_cluster_parameter_group():
         Description="This is my parameter group",
     )
 
-    groups = conn.describe_cluster_parameter_groups()['ParameterGroups']
+    groups = conn.describe_cluster_parameter_groups()["ParameterGroups"]
     groups.should.have.length_of(2)  # The default group already exists
 
     conn.delete_cluster_parameter_group(ParameterGroupName="my_parameter_group")
 
-    groups = conn.describe_cluster_parameter_groups()['ParameterGroups']
+    groups = conn.describe_cluster_parameter_groups()["ParameterGroups"]
     groups.should.have.length_of(1)
 
     # Delete invalid id
