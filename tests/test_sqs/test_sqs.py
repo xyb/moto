@@ -659,7 +659,7 @@ def queue_size(conn, queue_url):
 @mock_sqs
 def test_send_message_with_delay():
     conn = boto3.client("sqs", region_name="us-east-1")
-    sqs = boto3.resource("sqs")
+    sqs = boto3.resource("sqs", region_name="us-east-1")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "3"}
     )["QueueUrl"]
@@ -699,7 +699,7 @@ def test_send_large_message_fails():
 @mock_sqs
 def test_message_becomes_inflight_when_received():
     conn = boto3.client("sqs", region_name="us-east-1")
-    sqs = boto3.resource("sqs")
+    sqs = boto3.resource("sqs", region_name="us-east-1")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "2"}
     )["QueueUrl"]

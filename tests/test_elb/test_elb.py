@@ -21,7 +21,7 @@ from moto.core import ACCOUNT_ID
 @mock_elb
 @mock_ec2
 def test_create_load_balancer():
-    conn = boto3.client("elb")
+    conn = boto3.client("elb", region_name="us-east-1")
     ec2 = boto3.client("ec2", region_name="us-east-1")
 
     security_group_id = ec2.create_security_group(
@@ -57,7 +57,7 @@ def test_create_load_balancer():
 
 @mock_elb
 def test_getting_missing_elb():
-    conn = boto3.client("elb")
+    conn = boto3.client("elb", region_name="us-east-1")
     conn.describe_load_balancers.when.called_with(
         LoadBalancerNames=["aaa"]
     ).should.throw(ClientError)
@@ -84,7 +84,7 @@ def test_create_elb_in_multiple_region():
 
 @mock_elb
 def test_create_load_balancer_with_certificate():
-    conn = boto3.client("elb")
+    conn = boto3.client("elb", region_name="us-east-1")
 
     zones = ["us-east-1a"]
     ports = [{
@@ -200,7 +200,7 @@ def test_apply_security_groups_to_load_balancer():
 
 @mock_elb
 def test_add_listener():
-    conn = boto3.client("elb")
+    conn = boto3.client("elb", region_name="us-east-1")
     zones = ["us-east-1a", "us-east-1b"]
     ports = [{"Protocol": "http", "LoadBalancerPort": 80, "InstancePort": 8080}]
 
@@ -221,7 +221,7 @@ def test_add_listener():
 
 @mock_elb
 def test_delete_listener():
-    conn = boto3.client("elb")
+    conn = boto3.client("elb", region_name="us-east-1")
 
     zones = ["us-east-1a", "us-east-1b"]
     ports = [{
@@ -287,7 +287,7 @@ def test_create_and_delete_listener_boto3_support():
 
 @mock_elb
 def test_set_sslcertificate():
-    conn = boto3.client("elb")
+    conn = boto3.client("elb", region_name="us-east-1")
 
     zones = ["us-east-1a", "us-east-1b"]
     ports = [{"Protocol": "tcp", "LoadBalancerPort": 443, "InstancePort": 8443}]
@@ -308,7 +308,7 @@ def test_set_sslcertificate():
 
 @mock_elb
 def test_get_load_balancers_by_name():
-    conn = boto3.client("elb")
+    conn = boto3.client("elb", region_name="us-east-1")
 
     zones = ["us-east-1a", "us-east-1b"]
     ports = [{
@@ -331,7 +331,7 @@ def test_get_load_balancers_by_name():
 
 @mock_elb
 def test_delete_load_balancer():
-    conn = boto3.client("elb")
+    conn = boto3.client("elb", region_name="us-east-1")
 
     zones = ["us-east-1a"]
     ports = [{
@@ -351,7 +351,7 @@ def test_delete_load_balancer():
 
 @mock_elb
 def test_create_health_check():
-    conn = boto3.client("elb")
+    conn = boto3.client("elb", region_name="us-east-1")
     hc = {
         "Interval": 20,
         "HealthyThreshold": 3,
@@ -413,7 +413,7 @@ def test_register_instances():
     instance_id1 = reservation['Instances'][0]['InstanceId']
     instance_id2 = reservation['Instances'][1]['InstanceId']
 
-    conn = boto3.client("elb")
+    conn = boto3.client("elb", region_name="us-east-1")
     ports = [{
         "Protocol": "http", "LoadBalancerPort": 80, "InstancePort": 8080
     }, {
@@ -462,7 +462,7 @@ def test_deregister_instances():
     instance_id1 = reservation['Instances'][0]['InstanceId']
     instance_id2 = reservation['Instances'][1]['InstanceId']
 
-    conn = boto3.client("elb")
+    conn = boto3.client("elb", region_name="us-east-1")
     ports = [{
         "Protocol": "http", "LoadBalancerPort": 80, "InstancePort": 8080
     }, {
@@ -520,7 +520,7 @@ def test_deregister_instances_boto3():
 
 @mock_elb
 def test_default_attributes():
-    conn = boto3.client("elb")
+    conn = boto3.client("elb", region_name="us-east-1")
     ports = [{
         "Protocol": "http", "LoadBalancerPort": 80, "InstancePort": 8080
     }, {
@@ -539,7 +539,7 @@ def test_default_attributes():
 
 @mock_elb
 def test_cross_zone_load_balancing_attribute():
-    conn = boto3.client("elb")
+    conn = boto3.client("elb", region_name="us-east-1")
     ports = [{
         "Protocol": "http", "LoadBalancerPort": 80, "InstancePort": 8080
     }, {
@@ -565,7 +565,7 @@ def test_cross_zone_load_balancing_attribute():
 
 @mock_elb
 def test_connection_draining_attribute():
-    conn = boto3.client("elb")
+    conn = boto3.client("elb", region_name="us-east-1")
     ports = [{
         "Protocol": "http", "LoadBalancerPort": 80, "InstancePort": 8080
     }, {
@@ -599,7 +599,7 @@ def test_connection_draining_attribute():
 
 @mock_elb
 def test_access_log_attribute():
-    conn = boto3.client("elb")
+    conn = boto3.client("elb", region_name="us-east-1")
     ports = [{
         "Protocol": "http", "LoadBalancerPort": 80, "InstancePort": 8080
     }, {
@@ -632,7 +632,7 @@ def test_access_log_attribute():
 
 @mock_elb
 def test_connection_settings_attribute():
-    conn = boto3.client("elb")
+    conn = boto3.client("elb", region_name="us-east-1")
     ports = [{
         "Protocol": "http", "LoadBalancerPort": 80, "InstancePort": 8080
     }, {
@@ -660,7 +660,7 @@ def test_connection_settings_attribute():
 
 @mock_elb
 def test_create_lb_cookie_stickiness_policy():
-    conn = boto3.client("elb")
+    conn = boto3.client("elb", region_name="us-east-1")
     ports = [{
         "Protocol": "http", "LoadBalancerPort": 80, "InstancePort": 8080
     }, {
@@ -690,7 +690,7 @@ def test_create_lb_cookie_stickiness_policy():
 
 @mock_elb
 def test_create_lb_cookie_stickiness_policy_no_expiry():
-    conn = boto3.client("elb")
+    conn = boto3.client("elb", region_name="us-east-1")
     ports = [{
         "Protocol": "http", "LoadBalancerPort": 80, "InstancePort": 8080
     }, {
@@ -711,7 +711,7 @@ def test_create_lb_cookie_stickiness_policy_no_expiry():
 
 @mock_elb
 def test_create_app_cookie_stickiness_policy():
-    conn = boto3.client("elb")
+    conn = boto3.client("elb", region_name="us-east-1")
     ports = [{
         "Protocol": "http", "LoadBalancerPort": 80, "InstancePort": 8080
     }, {
@@ -734,7 +734,7 @@ def test_create_app_cookie_stickiness_policy():
 
 @mock_elb
 def test_create_lb_policy():
-    conn = boto3.client("elb")
+    conn = boto3.client("elb", region_name="us-east-1")
     ports = [{
         "Protocol": "http", "LoadBalancerPort": 80, "InstancePort": 8080
     }, {
@@ -759,7 +759,7 @@ def test_create_lb_policy():
 
 @mock_elb
 def test_set_policies_of_listener():
-    conn = boto3.client("elb")
+    conn = boto3.client("elb", region_name="us-east-1")
     ports = [{
         "Protocol": "http", "LoadBalancerPort": 80, "InstancePort": 8080
     }, {
@@ -794,7 +794,7 @@ def test_set_policies_of_listener():
 
 @mock_elb
 def test_set_policies_of_backend_server():
-    conn = boto3.client("elb")
+    conn = boto3.client("elb", region_name="us-east-1")
     ports = [{
         "Protocol": "http", "LoadBalancerPort": 80, "InstancePort": 8080
     }, {
@@ -838,7 +838,7 @@ def test_describe_instance_health():
     instance_id1 = reservation['Instances'][0]['InstanceId']
     instance_id2 = reservation['Instances'][1]['InstanceId']
 
-    conn = boto3.client("elb")
+    conn = boto3.client("elb", region_name="us-east-1")
     zones = ["us-east-1a", "us-east-1b"]
     ports = [{
         "Protocol": "http", "LoadBalancerPort": 80, "InstancePort": 8080
@@ -1097,7 +1097,7 @@ def test_subnets():
 
 @mock_elb
 def test_create_load_balancer_duplicate():
-    conn = boto3.client("elb")
+    conn = boto3.client("elb", region_name="us-east-1")
     ports = [{
         "Protocol": "http", "LoadBalancerPort": 80, "InstancePort": 8080
     }, {
