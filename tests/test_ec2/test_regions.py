@@ -6,7 +6,7 @@ import sure
 import boto3
 from boto3 import Session
 
-from moto import mock_ec2_deprecated, mock_autoscaling, mock_elb
+from moto import mock_ec2, mock_ec2_deprecated, mock_autoscaling, mock_elb
 
 from moto.ec2 import ec2_backends
 
@@ -66,6 +66,7 @@ def test_add_servers_to_multiple_regions():
 
 @mock_autoscaling
 @mock_elb
+@mock_ec2
 def test_create_autoscaling_groups_in_different_regions():
     elb_conn = boto3.client("elb", region_name="us-east-1")
     elb_conn.create_load_balancer(
@@ -88,10 +89,16 @@ def test_create_autoscaling_groups_in_different_regions():
     }
     x = us_conn.create_launch_configuration(**config)
 
-    us_subnet_id = list(ec2_backends["us-east-1"].subnets["us-east-1c"].keys())[0]
-    ap_subnet_id = list(
-        ec2_backends["ap-northeast-1"].subnets["ap-northeast-1a"].keys()
-    )[0]
+    ec2_conn = boto3.client("ec2", region_name="us-east-1")
+    us_subnet_id = ec2_conn.describe_subnets(Filters=[
+        {"Name": "availabilityZone", "Values": ['us-east-1c']}
+    ])['Subnets'][0]['SubnetId']
+
+    ap_ec2_conn = boto3.client("ec2", region_name="ap-northeast-1")
+    ap_subnet_id = ap_ec2_conn.describe_subnets(Filters=[
+        {"Name": "availabilityZone", "Values": ['ap-northeast-1a']}
+    ])['Subnets'][0]['SubnetId']
+
     group = {
         "AutoScalingGroupName": "us_tester_group",
         "AvailabilityZones": ["us-east-1c"],
