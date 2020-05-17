@@ -12,9 +12,9 @@ def test_create_vault():
 
     conn.create_vault(vaultName="my_vault")
 
-    vaults = conn.list_vaults()['VaultList']
+    vaults = conn.list_vaults()["VaultList"]
     vaults.should.have.length_of(1)
-    vaults[0]['VaultName'].should.equal("my_vault")
+    vaults[0]["VaultName"].should.equal("my_vault")
 
 
 @mock_glacier
@@ -23,9 +23,9 @@ def test_delete_vault():
 
     conn.create_vault(vaultName="my_vault")
 
-    vaults = conn.list_vaults()['VaultList']
+    vaults = conn.list_vaults()["VaultList"]
     vaults.should.have.length_of(1)
 
     conn.delete_vault(vaultName="my_vault")
-    vaults = conn.list_vaults()['VaultList']
+    vaults = conn.list_vaults()["VaultList"]
     vaults.should.have.length_of(0)

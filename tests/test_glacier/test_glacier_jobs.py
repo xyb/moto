@@ -15,11 +15,15 @@ def test_init_glacier_job():
     vault_name = "my_vault"
     conn.create_vault(vaultName=vault_name)
     archive_id = conn.upload_archive(
-        vaultName=vault_name, body="some stuff", checksum="", archiveDescription="some description"
-    )['archiveId']
+        vaultName=vault_name,
+        body="some stuff",
+        checksum="",
+        archiveDescription="some description",
+    )["archiveId"]
 
     job_response = conn.initiate_job(
-        vaultName=vault_name, jobParameters={"ArchiveId": archive_id, "Type": "archive-retrieval"}
+        vaultName=vault_name,
+        jobParameters={"ArchiveId": archive_id, "Type": "archive-retrieval"},
     )
     job_id = job_response["jobId"]
     job_response["location"].should.contain("//vaults/my_vault/jobs/{0}".format(job_id))
@@ -31,10 +35,14 @@ def test_describe_job():
     vault_name = "my_vault"
     conn.create_vault(vaultName=vault_name)
     archive_id = conn.upload_archive(
-        vaultName=vault_name, body="some stuff", checksum="", archiveDescription="some description"
-    )['archiveId']
+        vaultName=vault_name,
+        body="some stuff",
+        checksum="",
+        archiveDescription="some description",
+    )["archiveId"]
     job_response = conn.initiate_job(
-        vaultName=vault_name, jobParameters={"ArchiveId": archive_id, "Type": "archive-retrieval"}
+        vaultName=vault_name,
+        jobParameters={"ArchiveId": archive_id, "Type": "archive-retrieval"},
     )
     job_id = job_response["jobId"]
 
@@ -53,17 +61,25 @@ def test_list_glacier_jobs():
     vault_name = "my_vault"
     conn.create_vault(vaultName=vault_name)
     archive_id1 = conn.upload_archive(
-        vaultName=vault_name, body="some stuff", checksum="", archiveDescription="some description"
+        vaultName=vault_name,
+        body="some stuff",
+        checksum="",
+        archiveDescription="some description",
     )["archiveId"]
     archive_id2 = conn.upload_archive(
-        vaultName=vault_name, body="some other stuff", checksum="", archiveDescription="some description"
+        vaultName=vault_name,
+        body="some other stuff",
+        checksum="",
+        archiveDescription="some description",
     )["archiveId"]
 
     conn.initiate_job(
-        vaultName=vault_name, jobParameters={"ArchiveId": archive_id1, "Type": "archive-retrieval"}
+        vaultName=vault_name,
+        jobParameters={"ArchiveId": archive_id1, "Type": "archive-retrieval"},
     )
     conn.initiate_job(
-        vaultName=vault_name, jobParameters={"ArchiveId": archive_id2, "Type": "archive-retrieval"}
+        vaultName=vault_name,
+        jobParameters={"ArchiveId": archive_id2, "Type": "archive-retrieval"},
     )
 
     jobs = conn.list_jobs(vaultName=vault_name)
@@ -76,15 +92,19 @@ def test_get_job_output():
     vault_name = "my_vault"
     conn.create_vault(vaultName=vault_name)
     archive_response = conn.upload_archive(
-        vaultName=vault_name, body="some stuff", checksum="", archiveDescription="some description"
+        vaultName=vault_name,
+        body="some stuff",
+        checksum="",
+        archiveDescription="some description",
     )
     archive_id = archive_response["archiveId"]
     job_response = conn.initiate_job(
-        vaultName=vault_name, jobParameters={"ArchiveId": archive_id, "Type": "archive-retrieval"}
+        vaultName=vault_name,
+        jobParameters={"ArchiveId": archive_id, "Type": "archive-retrieval"},
     )
     job_id = job_response["jobId"]
 
     time.sleep(6)
 
-    output = conn.get_job_output(vaultName=vault_name, jobId=job_id)['body']
+    output = conn.get_job_output(vaultName=vault_name, jobId=job_id)["body"]
     output.read().decode("utf-8").should.equal("some stuff")

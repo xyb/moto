@@ -18,12 +18,11 @@ class TestNestedDecorators(unittest.TestCase):
         queue = sqs.create_queue(QueueName="some-queue")
         msg = queue.send_message(MessageBody="This is my first message.")
 
-        int(conn.get_queue_attributes(
-                QueueUrl=queue.url,
-                AttributeNames=['ApproximateNumberOfMessages']
-            )['Attributes']['ApproximateNumberOfMessages']
+        int(
+            conn.get_queue_attributes(
+                QueueUrl=queue.url, AttributeNames=["ApproximateNumberOfMessages"]
+            )["Attributes"]["ApproximateNumberOfMessages"]
         ).should.equal(1)
-
 
     @mock_ec2
     def test_nested(self):

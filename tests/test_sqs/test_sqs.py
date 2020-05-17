@@ -606,17 +606,17 @@ def test_send_message_with_xml_characters():
     conn = boto3.client("sqs")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "3"}
-    )['QueueUrl']
+    )["QueueUrl"]
 
     body_one = "< & >"
 
     conn.send_message(QueueUrl=queue_url, MessageBody=body_one)
 
-    messages = conn.receive_message(
-        QueueUrl=queue_url, MaxNumberOfMessages=1,
-    )['Messages']
+    messages = conn.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=1,)[
+        "Messages"
+    ]
 
-    messages[0]['Body'].should.equal(body_one)
+    messages[0]["Body"].should.equal(body_one)
 
 
 @mock_sqs
@@ -624,7 +624,7 @@ def test_send_message_with_attributes():
     conn = boto3.client("sqs")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "3"}
-    )['QueueUrl']
+    )["QueueUrl"]
 
     body = "this is a test message"
     BASE64_BINARY = base64.b64encode(b"binary value")
@@ -633,35 +633,26 @@ def test_send_message_with_attributes():
             "DataType": "String",
             "StringValue": "attribute value",
         },
-        "test.binary_attribute": {
-            "DataType": "Binary",
-            "BinaryValue": BASE64_BINARY
-        },
-        "test.number_attribute": {
-            "DataType": "Number",
-            "StringValue": "string value",
-        },
+        "test.binary_attribute": {"DataType": "Binary", "BinaryValue": BASE64_BINARY},
+        "test.number_attribute": {"DataType": "Number", "StringValue": "string value",},
     }
 
     conn.send_message(
-        QueueUrl=queue_url,
-        MessageBody=body,
-        MessageAttributes=message_attributes,
+        QueueUrl=queue_url, MessageBody=body, MessageAttributes=message_attributes,
     )
 
-    messages = conn.receive_message(QueueUrl=queue_url)['Messages']
-    messages[0]['Body'].should.equal(body)
+    messages = conn.receive_message(QueueUrl=queue_url)["Messages"]
+    messages[0]["Body"].should.equal(body)
 
     for name, value in message_attributes.items():
-        dict(messages[0]['MessageAttributes'][name]).should.equal(value)
+        dict(messages[0]["MessageAttributes"][name]).should.equal(value)
 
 
 def queue_size(conn, queue_url):
     return int(
         conn.get_queue_attributes(
-            QueueUrl=queue_url,
-            AttributeNames=['ApproximateNumberOfMessages']
-        )['Attributes']['ApproximateNumberOfMessages']
+            QueueUrl=queue_url, AttributeNames=["ApproximateNumberOfMessages"]
+        )["Attributes"]["ApproximateNumberOfMessages"]
     )
 
 
@@ -670,7 +661,8 @@ def test_send_message_with_delay():
     conn = boto3.client("sqs")
     sqs = boto3.resource("sqs")
     queue_url = conn.create_queue(
-        QueueName="test-queue", Attributes={"VisibilityTimeout": "3"})['QueueUrl']
+        QueueName="test-queue", Attributes={"VisibilityTimeout": "3"}
+    )["QueueUrl"]
     queue = sqs.Queue(queue_url)
 
     body_one = "this is a test message"
@@ -681,17 +673,21 @@ def test_send_message_with_delay():
 
     queue_size(conn, queue_url).should.equal(1)
 
-    messages = conn.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=2)['Messages']
+    messages = conn.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=2)[
+        "Messages"
+    ]
     assert len(messages) == 1
     message = messages[0]
-    assert message['Body'].should.equal(body_two)
+    assert message["Body"].should.equal(body_two)
     queue_size(conn, queue_url).should.equal(0)
 
 
 @mock_sqs
 def test_send_large_message_fails():
     conn = boto3.client("sqs")
-    queue_url = conn.create_queue(QueueName="test-queue", Attributes={"VisibilityTimeout": "3"})['QueueUrl']
+    queue_url = conn.create_queue(
+        QueueName="test-queue", Attributes={"VisibilityTimeout": "3"}
+    )["QueueUrl"]
 
     body_one = "test message" * 200000
 
@@ -706,7 +702,7 @@ def test_message_becomes_inflight_when_received():
     sqs = boto3.resource("sqs")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "2"}
-    )['QueueUrl']
+    )["QueueUrl"]
     queue = sqs.Queue(queue_url)
 
     body_one = "this is a test message"
@@ -714,7 +710,9 @@ def test_message_becomes_inflight_when_received():
 
     queue_size(conn, queue_url).should.equal(1)
 
-    messages = conn.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=1)['Messages']
+    messages = conn.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=1)[
+        "Messages"
+    ]
     queue_size(conn, queue_url).should.equal(0)
 
     assert len(messages) == 1
@@ -730,7 +728,7 @@ def test_receive_message_with_explicit_visibility_timeout():
     conn = boto3.client("sqs")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "3"}
-    )['QueueUrl']
+    )["QueueUrl"]
 
     body_one = "this is another test message"
     conn.send_message(QueueUrl=queue_url, MessageBody=body_one)
@@ -738,7 +736,7 @@ def test_receive_message_with_explicit_visibility_timeout():
     queue_size(conn, queue_url).should.equal(1)
     messages = conn.receive_message(
         QueueUrl=queue_url, MaxNumberOfMessages=1, VisibilityTimeout=0
-    )['Messages']
+    )["Messages"]
 
     assert len(messages) == 1
 
@@ -751,15 +749,15 @@ def test_change_message_visibility():
     conn = boto3.client("sqs")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "2"}
-    )['QueueUrl']
+    )["QueueUrl"]
 
     body_one = "this is another test message"
     conn.send_message(QueueUrl=queue_url, MessageBody=body_one)
 
     queue_size(conn, queue_url).should.equal(1)
-    messages = conn.receive_message(
-        QueueUrl=queue_url, MaxNumberOfMessages=1
-    )['Messages']
+    messages = conn.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=1)[
+        "Messages"
+    ]
 
     assert len(messages) == 1
 
@@ -767,8 +765,8 @@ def test_change_message_visibility():
 
     conn.change_message_visibility(
         QueueUrl=queue_url,
-        ReceiptHandle=messages[0]['ReceiptHandle'],
-        VisibilityTimeout=2
+        ReceiptHandle=messages[0]["ReceiptHandle"],
+        VisibilityTimeout=2,
     )
 
     # Wait
@@ -782,8 +780,10 @@ def test_change_message_visibility():
     # Message now becomes visible
     queue_size(conn, queue_url).should.equal(1)
 
-    messages = conn.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=1)['Messages']
-    conn.delete_message(QueueUrl=queue_url, ReceiptHandle=messages[0]['ReceiptHandle'])
+    messages = conn.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=1)[
+        "Messages"
+    ]
+    conn.delete_message(QueueUrl=queue_url, ReceiptHandle=messages[0]["ReceiptHandle"])
 
     queue_size(conn, queue_url).should.equal(0)
 
@@ -793,19 +793,21 @@ def test_message_attributes():
     conn = boto3.client("sqs")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "2"}
-    )['QueueUrl']
+    )["QueueUrl"]
 
     body_one = "this is another test message"
     conn.send_message(QueueUrl=queue_url, MessageBody=body_one)
 
     queue_size(conn, queue_url).should.equal(1)
 
-    messages = conn.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=1)['Messages']
+    messages = conn.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=1)[
+        "Messages"
+    ]
     queue_size(conn, queue_url).should.equal(0)
 
     assert len(messages) == 1
 
-    message_attributes = messages[0]['Attributes']
+    message_attributes = messages[0]["Attributes"]
 
     assert message_attributes.get("ApproximateFirstReceiveTimestamp")
     assert int(message_attributes.get("ApproximateReceiveCount")) == 1
@@ -816,12 +818,14 @@ def test_message_attributes():
 @mock_sqs
 def test_read_message_from_queue():
     conn = boto3.client("sqs")
-    queue_url = conn.create_queue(QueueName="testqueue")['QueueUrl']
+    queue_url = conn.create_queue(QueueName="testqueue")["QueueUrl"]
 
     body = "foo bar baz"
     conn.send_message(QueueUrl=queue_url, MessageBody=body)
-    message = conn.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=1)['Messages'][0]
-    message['Body'].should.equal(body)
+    message = conn.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=1)[
+        "Messages"
+    ][0]
+    message["Body"].should.equal(body)
 
 
 @mock_sqs
@@ -829,7 +833,7 @@ def test_queue_length():
     conn = boto3.client("sqs")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "3"}
-    )['QueueUrl']
+    )["QueueUrl"]
 
     conn.send_message(QueueUrl=queue_url, MessageBody="this is a test message")
     conn.send_message(QueueUrl=queue_url, MessageBody="this is another test message")
@@ -842,20 +846,24 @@ def test_delete_message():
     conn = boto3.client("sqs")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "3"}
-    )['QueueUrl']
+    )["QueueUrl"]
 
     conn.send_message(QueueUrl=queue_url, MessageBody="this is a test message")
     conn.send_message(QueueUrl=queue_url, MessageBody="this is another test message")
     queue_size(conn, queue_url).should.equal(2)
 
-    messages = conn.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=1)['Messages']
+    messages = conn.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=1)[
+        "Messages"
+    ]
     assert len(messages) == 1
-    conn.delete_message(QueueUrl=queue_url, ReceiptHandle=messages[0]['ReceiptHandle'])
+    conn.delete_message(QueueUrl=queue_url, ReceiptHandle=messages[0]["ReceiptHandle"])
     queue_size(conn, queue_url).should.equal(1)
 
-    messages = conn.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=1)['Messages']
+    messages = conn.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=1)[
+        "Messages"
+    ]
     assert len(messages) == 1
-    conn.delete_message(QueueUrl=queue_url, ReceiptHandle=messages[0]['ReceiptHandle'])
+    conn.delete_message(QueueUrl=queue_url, ReceiptHandle=messages[0]["ReceiptHandle"])
     queue_size(conn, queue_url).should.equal(0)
 
 
@@ -864,7 +872,7 @@ def test_send_batch_operation():
     conn = boto3.client("sqs")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "3"}
-    )['QueueUrl']
+    )["QueueUrl"]
 
     conn.send_message_batch(
         QueueUrl=queue_url,
@@ -872,11 +880,13 @@ def test_send_batch_operation():
             {"Id": "my_first_message", "MessageBody": "test message 1"},
             {"Id": "my_second_message", "MessageBody": "test message 2"},
             {"Id": "my_third_message", "MessageBody": "test message 3"},
-        ]
+        ],
     )
 
-    messages = conn.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=3)['Messages']
-    messages[0]['Body'].should.equal("test message 1")
+    messages = conn.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=3)[
+        "Messages"
+    ]
+    messages[0]["Body"].should.equal("test message 1")
 
     # Test that pulling more messages doesn't break anything
     messages = conn.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=2)
@@ -887,28 +897,22 @@ def test_send_batch_operation_with_message_attributes():
     conn = boto3.client("sqs")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "3"}
-    )['QueueUrl']
+    )["QueueUrl"]
 
     message_tuple = {
         "Id": "my_first_message",
         "MessageBody": "test message 1",
-        "MessageAttributes": {
-            "name1": {
-                "DataType": "String",
-                "StringValue": "foo",
-            }
-        },
+        "MessageAttributes": {"name1": {"DataType": "String", "StringValue": "foo",}},
     }
     conn.send_message_batch(
-        QueueUrl=queue_url,
-        Entries=[message_tuple],
+        QueueUrl=queue_url, Entries=[message_tuple],
     )
 
-    messages = conn.receive_message(QueueUrl=queue_url)['Messages']
-    messages[0]['Body'].should.equal("test message 1")
+    messages = conn.receive_message(QueueUrl=queue_url)["Messages"]
+    messages[0]["Body"].should.equal("test message 1")
 
     for name, value in message_tuple["MessageAttributes"].items():
-        dict(messages[0]['MessageAttributes'][name]).should.equal(value)
+        dict(messages[0]["MessageAttributes"][name]).should.equal(value)
 
 
 @mock_sqs
@@ -916,7 +920,7 @@ def test_delete_batch_operation():
     conn = boto3.client("sqs")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "3"}
-    )['QueueUrl']
+    )["QueueUrl"]
 
     message_dicts = [
         {"Id": "my_first_message", "MessageBody": "test message 1"},
@@ -925,15 +929,19 @@ def test_delete_batch_operation():
     ]
 
     conn.send_message_batch(
-        QueueUrl=queue_url,
-        Entries=message_dicts,
+        QueueUrl=queue_url, Entries=message_dicts,
     )
 
-    messages = conn.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=2)['Messages']
-    conn.delete_message_batch(QueueUrl=queue_url, Entries=[{
-        "Id": message['MessageId'],
-        "ReceiptHandle": message['ReceiptHandle'],
-    } for message in messages])
+    messages = conn.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=2)[
+        "Messages"
+    ]
+    conn.delete_message_batch(
+        QueueUrl=queue_url,
+        Entries=[
+            {"Id": message["MessageId"], "ReceiptHandle": message["ReceiptHandle"],}
+            for message in messages
+        ],
+    )
 
     queue_size(conn, queue_url).should.equal(1)
 
@@ -947,9 +955,9 @@ def test_queue_attributes():
 
     queue_url = conn.create_queue(
         QueueName=queue_name, Attributes={"VisibilityTimeout": visibility_timeout}
-    )['QueueUrl']
+    )["QueueUrl"]
 
-    attributes = conn.get_queue_attributes(QueueUrl=queue_url)['Attributes']
+    attributes = conn.get_queue_attributes(QueueUrl=queue_url)["Attributes"]
 
     attributes["QueueArn"].should.look_like(
         "arn:aws:sqs:us-east-1:{AccountId}:{name}".format(
@@ -978,11 +986,13 @@ def test_change_message_visibility_on_invalid_receipt():
     conn = boto3.client("sqs")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "1"}
-    )['QueueUrl']
+    )["QueueUrl"]
 
     conn.send_message(QueueUrl=queue_url, MessageBody="this is another test message")
     queue_size(conn, queue_url).should.equal(1)
-    messages = conn.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=1)['Messages']
+    messages = conn.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=1)[
+        "Messages"
+    ]
 
     assert len(messages) == 1
 
@@ -994,13 +1004,15 @@ def test_change_message_visibility_on_invalid_receipt():
 
     queue_size(conn, queue_url).should.equal(1)
 
-    messages = conn.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=1)['Messages']
+    messages = conn.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=1)[
+        "Messages"
+    ]
 
     assert len(messages) == 1
 
     conn.change_message_visibility.when.called_with(
         QueueUrl=queue_url,
-        ReceiptHandle=original_message['ReceiptHandle'],
+        ReceiptHandle=original_message["ReceiptHandle"],
         VisibilityTimeout=100,
     ).should.throw(ClientError)
 
@@ -1010,11 +1022,13 @@ def test_change_message_visibility_on_visible_message():
     conn = boto3.client("sqs")
     queue_url = conn.create_queue(
         QueueName="test-queue", Attributes={"VisibilityTimeout": "1"}
-    )['QueueUrl']
+    )["QueueUrl"]
 
     conn.send_message(QueueUrl=queue_url, MessageBody="this is another test message")
     queue_size(conn, queue_url).should.equal(1)
-    messages = conn.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=1)['Messages']
+    messages = conn.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=1)[
+        "Messages"
+    ]
 
     assert len(messages) == 1
 
@@ -1028,7 +1042,7 @@ def test_change_message_visibility_on_visible_message():
 
     conn.change_message_visibility.when.called_with(
         QueueUrl=queue_url,
-        ReceiptHandle=original_message['ReceiptHandle'],
+        ReceiptHandle=original_message["ReceiptHandle"],
         VisibilityTimeout=100,
     ).should.throw(ClientError)
 
@@ -1037,7 +1051,7 @@ def test_change_message_visibility_on_visible_message():
 def test_purge_action():
     conn = boto3.client("sqs", region_name="us-east-1")
 
-    queue_url = conn.create_queue(QueueName="new-queue")['QueueUrl']
+    queue_url = conn.create_queue(QueueName="new-queue")["QueueUrl"]
     conn.send_message(QueueUrl=queue_url, MessageBody="this is another test message")
     queue_size(conn, queue_url).should.equal(1)
 
@@ -1052,18 +1066,18 @@ def test_delete_message_after_visibility_timeout():
     conn = boto3.client("sqs", region_name="us-east-1")
     queue_url = conn.create_queue(
         QueueName="new-queue", Attributes={"VisibilityTimeout": str(VISIBILITY_TIMEOUT)}
-    )['QueueUrl']
+    )["QueueUrl"]
 
     conn.send_message(QueueUrl=queue_url, MessageBody="Message 1!")
 
     queue_size(conn, queue_url).should.equal(1)
 
-    message = conn.receive_message(
-        QueueUrl=queue_url, MaxNumberOfMessages=1,
-    )['Messages'][0]
+    message = conn.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=1,)[
+        "Messages"
+    ][0]
     time.sleep(VISIBILITY_TIMEOUT + 1)
 
-    conn.delete_message(QueueUrl=queue_url, ReceiptHandle=message['ReceiptHandle'])
+    conn.delete_message(QueueUrl=queue_url, ReceiptHandle=message["ReceiptHandle"])
 
     queue_size(conn, queue_url).should.equal(0)
 

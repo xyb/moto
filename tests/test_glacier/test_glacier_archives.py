@@ -14,6 +14,8 @@ def test_create_and_delete_archive():
     conn = boto3.client("glacier", region_name="us-west-2")
     _ = conn.create_vault(vaultName=vault_name)
 
-    archive_id = conn.upload_archive(vaultName=vault_name, body=b"some stuff")['archiveId']
+    archive_id = conn.upload_archive(vaultName=vault_name, body=b"some stuff")[
+        "archiveId"
+    ]
 
     conn.delete_archive(vaultName=vault_name, archiveId=archive_id)
