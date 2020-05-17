@@ -90,14 +90,14 @@ def test_create_autoscaling_groups_in_different_regions():
     x = us_conn.create_launch_configuration(**config)
 
     ec2_conn = boto3.client("ec2", region_name="us-east-1")
-    us_subnet_id = ec2_conn.describe_subnets(Filters=[
-        {"Name": "availabilityZone", "Values": ['us-east-1c']}
-    ])['Subnets'][0]['SubnetId']
+    us_subnet_id = ec2_conn.describe_subnets(
+        Filters=[{"Name": "availabilityZone", "Values": ["us-east-1c"]}]
+    )["Subnets"][0]["SubnetId"]
 
     ap_ec2_conn = boto3.client("ec2", region_name="ap-northeast-1")
-    ap_subnet_id = ap_ec2_conn.describe_subnets(Filters=[
-        {"Name": "availabilityZone", "Values": ['ap-northeast-1a']}
-    ])['Subnets'][0]['SubnetId']
+    ap_subnet_id = ap_ec2_conn.describe_subnets(
+        Filters=[{"Name": "availabilityZone", "Values": ["ap-northeast-1a"]}]
+    )["Subnets"][0]["SubnetId"]
 
     group = {
         "AutoScalingGroupName": "us_tester_group",

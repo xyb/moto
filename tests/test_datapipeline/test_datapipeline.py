@@ -70,7 +70,9 @@ def test_creating_pipeline_definition():
     res = conn.create_pipeline(name="mypipeline", uniqueId="some-unique-id")
     pipeline_id = res["pipelineId"]
 
-    conn.put_pipeline_definition(pipelineObjects=PIPELINE_OBJECTS, pipelineId=pipeline_id)
+    conn.put_pipeline_definition(
+        pipelineObjects=PIPELINE_OBJECTS, pipelineId=pipeline_id
+    )
 
     pipeline_definition = conn.get_pipeline_definition(pipelineId=pipeline_id)
     pipeline_definition["pipelineObjects"].should.have.length_of(3)
@@ -88,11 +90,13 @@ def test_describing_pipeline_objects():
     res = conn.create_pipeline(name="mypipeline", uniqueId="some-unique-id")
     pipeline_id = res["pipelineId"]
 
-    conn.put_pipeline_definition(pipelineObjects=PIPELINE_OBJECTS, pipelineId=pipeline_id)
+    conn.put_pipeline_definition(
+        pipelineObjects=PIPELINE_OBJECTS, pipelineId=pipeline_id
+    )
 
-    objects = conn.describe_objects(objectIds=["Schedule", "Default"], pipelineId=pipeline_id)[
-        "pipelineObjects"
-    ]
+    objects = conn.describe_objects(
+        objectIds=["Schedule", "Default"], pipelineId=pipeline_id
+    )["pipelineObjects"]
 
     objects.should.have.length_of(2)
     default_object = [x for x in objects if x["id"] == "Default"][0]

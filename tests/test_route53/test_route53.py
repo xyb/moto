@@ -31,9 +31,7 @@ def test_hosted_zone():
     zones = conn.list_hosted_zones()
     len(zones["HostedZones"]).should.equal(1)
 
-    conn.get_hosted_zone.when.called_with(Id="abcd").should.throw(
-        ClientError
-    )
+    conn.get_hosted_zone.when.called_with(Id="abcd").should.throw(ClientError)
 
 
 @mock_route53
@@ -42,9 +40,7 @@ def test_rrset():
 
     conn.list_resource_record_sets.when.called_with(
         HostedZoneId="abcd", StartRecordType="A"
-    ).should.throw(
-        ClientError
-    )
+    ).should.throw(ClientError)
 
     zone = conn.create_hosted_zone(Name="testdns.aws.com", CallerReference="abcd")
     zoneid = zone["HostedZone"]["Id"].split("/")[-1]
@@ -52,191 +48,218 @@ def test_rrset():
     conn.change_resource_record_sets(
         HostedZoneId=zoneid,
         ChangeBatch={
-            'Changes': [{
-                "Action": "CREATE",
-                "ResourceRecordSet": {
-                    "Name": "foo.bar.testdns.aws.com",
-                    "Type": "A",
-                    "ResourceRecords": [{"Value": "1.2.3.4"}]
+            "Changes": [
+                {
+                    "Action": "CREATE",
+                    "ResourceRecordSet": {
+                        "Name": "foo.bar.testdns.aws.com",
+                        "Type": "A",
+                        "ResourceRecords": [{"Value": "1.2.3.4"}],
+                    },
                 }
-            }]
-        }
+            ]
+        },
     )
 
-    rrsets = conn.list_resource_record_sets(
-        HostedZoneId=zoneid, StartRecordType="A"
-    )['ResourceRecordSets']
+    rrsets = conn.list_resource_record_sets(HostedZoneId=zoneid, StartRecordType="A")[
+        "ResourceRecordSets"
+    ]
     rrsets.should.have.length_of(1)
-    rrsets[0]['ResourceRecords'][0]['Value'].should.equal("1.2.3.4")
+    rrsets[0]["ResourceRecords"][0]["Value"].should.equal("1.2.3.4")
 
     rrsets = conn.list_resource_record_sets(
         HostedZoneId=zoneid, StartRecordType="CNAME"
-    )['ResourceRecordSets']
+    )["ResourceRecordSets"]
     rrsets.should.have.length_of(0)
 
     conn.change_resource_record_sets(
         HostedZoneId=zoneid,
         ChangeBatch={
-            'Changes': [{
-                "Action": "DELETE",
-                "ResourceRecordSet": {
-                    "Name": "foo.bar.testdns.aws.com",
-                    "Type": "A",
-                }
-            }, {
-                "Action": "CREATE",
-                "ResourceRecordSet": {
-                    "Name": "foo.bar.testdns.aws.com",
-                    "Type": "A",
-                    "ResourceRecords": [{"Value": "5.6.7.8"}]
-                }
-            }]
-        }
+            "Changes": [
+                {
+                    "Action": "DELETE",
+                    "ResourceRecordSet": {
+                        "Name": "foo.bar.testdns.aws.com",
+                        "Type": "A",
+                    },
+                },
+                {
+                    "Action": "CREATE",
+                    "ResourceRecordSet": {
+                        "Name": "foo.bar.testdns.aws.com",
+                        "Type": "A",
+                        "ResourceRecords": [{"Value": "5.6.7.8"}],
+                    },
+                },
+            ]
+        },
     )
 
-    rrsets = conn.list_resource_record_sets(
-        HostedZoneId=zoneid, StartRecordType="A",
-    )['ResourceRecordSets']
+    rrsets = conn.list_resource_record_sets(HostedZoneId=zoneid, StartRecordType="A",)[
+        "ResourceRecordSets"
+    ]
     rrsets.should.have.length_of(1)
-    rrsets[0]['ResourceRecords'][0]['Value'].should.equal("5.6.7.8")
+    rrsets[0]["ResourceRecords"][0]["Value"].should.equal("5.6.7.8")
 
     conn.change_resource_record_sets(
         HostedZoneId=zoneid,
         ChangeBatch={
-            'Changes': [{
-                "Action": "DELETE",
-                "ResourceRecordSet": {
-                    "Name": "foo.bar.testdns.aws.com",
-                    "Type": "A",
+            "Changes": [
+                {
+                    "Action": "DELETE",
+                    "ResourceRecordSet": {
+                        "Name": "foo.bar.testdns.aws.com",
+                        "Type": "A",
+                    },
                 }
-            }]
-        }
+            ]
+        },
     )
 
-    rrsets = conn.list_resource_record_sets(HostedZoneId=zoneid)['ResourceRecordSets']
+    rrsets = conn.list_resource_record_sets(HostedZoneId=zoneid)["ResourceRecordSets"]
     rrsets.should.have.length_of(0)
 
     conn.change_resource_record_sets(
         HostedZoneId=zoneid,
         ChangeBatch={
-            'Changes': [{
-                "Action": "UPSERT",
-                "ResourceRecordSet": {
-                    "Name": "foo.bar.testdns.aws.com",
-                    "Type": "A",
-                    "ResourceRecords": [{"Value": "1.2.3.4"}]
+            "Changes": [
+                {
+                    "Action": "UPSERT",
+                    "ResourceRecordSet": {
+                        "Name": "foo.bar.testdns.aws.com",
+                        "Type": "A",
+                        "ResourceRecords": [{"Value": "1.2.3.4"}],
+                    },
                 }
-            }]
-        }
+            ]
+        },
     )
 
-    rrsets = conn.list_resource_record_sets(
-        HostedZoneId=zoneid, StartRecordType="A"
-    )['ResourceRecordSets']
+    rrsets = conn.list_resource_record_sets(HostedZoneId=zoneid, StartRecordType="A")[
+        "ResourceRecordSets"
+    ]
     rrsets.should.have.length_of(1)
-    rrsets[0]['ResourceRecords'][0]['Value'].should.equal("1.2.3.4")
+    rrsets[0]["ResourceRecords"][0]["Value"].should.equal("1.2.3.4")
 
     conn.change_resource_record_sets(
         HostedZoneId=zoneid,
         ChangeBatch={
-            'Changes': [{
-                "Action": "UPSERT",
-                "ResourceRecordSet": {
-                    "Name": "foo.bar.testdns.aws.com",
-                    "Type": "A",
-                    "ResourceRecords": [{"Value": "5.6.7.8"}]
+            "Changes": [
+                {
+                    "Action": "UPSERT",
+                    "ResourceRecordSet": {
+                        "Name": "foo.bar.testdns.aws.com",
+                        "Type": "A",
+                        "ResourceRecords": [{"Value": "5.6.7.8"}],
+                    },
                 }
-            }]
-        }
+            ]
+        },
     )
 
-    rrsets = conn.list_resource_record_sets(
-        HostedZoneId=zoneid, StartRecordType="A",
-    )['ResourceRecordSets']
+    rrsets = conn.list_resource_record_sets(HostedZoneId=zoneid, StartRecordType="A",)[
+        "ResourceRecordSets"
+    ]
     rrsets.should.have.length_of(1)
-    rrsets[0]['ResourceRecords'][0]['Value'].should.equal("5.6.7.8")
+    rrsets[0]["ResourceRecords"][0]["Value"].should.equal("5.6.7.8")
 
     conn.change_resource_record_sets(
         HostedZoneId=zoneid,
         ChangeBatch={
-            'Changes': [{
-                "Action": "UPSERT",
-                "ResourceRecordSet": {
-                    "Name": "foo.bar.testdns.aws.com",
-                    "Type": "TXT",
-                    "ResourceRecords": [{"Value": "foo"}]
+            "Changes": [
+                {
+                    "Action": "UPSERT",
+                    "ResourceRecordSet": {
+                        "Name": "foo.bar.testdns.aws.com",
+                        "Type": "TXT",
+                        "ResourceRecords": [{"Value": "foo"}],
+                    },
                 }
-            }]
-        }
+            ]
+        },
     )
 
-    rrsets = conn.list_resource_record_sets(HostedZoneId=zoneid)['ResourceRecordSets']
+    rrsets = conn.list_resource_record_sets(HostedZoneId=zoneid)["ResourceRecordSets"]
     rrsets.should.have.length_of(2)
-    rrsets[0]['ResourceRecords'][0]['Value'].should.equal("5.6.7.8")
-    rrsets[1]['ResourceRecords'][0]['Value'].should.equal("foo")
+    rrsets[0]["ResourceRecords"][0]["Value"].should.equal("5.6.7.8")
+    rrsets[1]["ResourceRecords"][0]["Value"].should.equal("foo")
 
     conn.change_resource_record_sets(
         HostedZoneId=zoneid,
         ChangeBatch={
-            'Changes': [{
-                "Action": "DELETE",
-                "ResourceRecordSet": {
-                    "Name": "foo.bar.testdns.aws.com",
-                    "Type": "A",
-                }
-            }, {
-                "Action": "DELETE",
-                "ResourceRecordSet": {
-                    "Name": "foo.bar.testdns.aws.com",
-                    "Type": "TXT",
-                }
-            }]
-        }
+            "Changes": [
+                {
+                    "Action": "DELETE",
+                    "ResourceRecordSet": {
+                        "Name": "foo.bar.testdns.aws.com",
+                        "Type": "A",
+                    },
+                },
+                {
+                    "Action": "DELETE",
+                    "ResourceRecordSet": {
+                        "Name": "foo.bar.testdns.aws.com",
+                        "Type": "TXT",
+                    },
+                },
+            ]
+        },
     )
 
     conn.change_resource_record_sets(
         HostedZoneId=zoneid,
         ChangeBatch={
-            'Changes': [{
-                "Action": "CREATE",
-                "ResourceRecordSet": {
-                    "Name": "foo.bar.testdns.aws.com",
-                    "Type": "A",
-                    "ResourceRecords": [{"Value": "1.2.3.4"}]
-                }
-            }, {
-                "Action": "CREATE",
-                "ResourceRecordSet": {
-                    "Name": "bar.foo.testdns.aws.com",
-                    "Type": "A",
-                    "ResourceRecords": [{"Value": "5.6.7.8"}]
-                }
-            }]
-        }
+            "Changes": [
+                {
+                    "Action": "CREATE",
+                    "ResourceRecordSet": {
+                        "Name": "foo.bar.testdns.aws.com",
+                        "Type": "A",
+                        "ResourceRecords": [{"Value": "1.2.3.4"}],
+                    },
+                },
+                {
+                    "Action": "CREATE",
+                    "ResourceRecordSet": {
+                        "Name": "bar.foo.testdns.aws.com",
+                        "Type": "A",
+                        "ResourceRecords": [{"Value": "5.6.7.8"}],
+                    },
+                },
+            ]
+        },
     )
+
+    rrsets = conn.list_resource_record_sets(HostedZoneId=zoneid, StartRecordType="A",)[
+        "ResourceRecordSets"
+    ]
+    rrsets.should.have.length_of(2)
 
     rrsets = conn.list_resource_record_sets(
-        HostedZoneId=zoneid, StartRecordType="A",
-    )['ResourceRecordSets']
-    rrsets.should.have.length_of(2)
-
-    rrsets = conn.list_resource_record_sets(
-        HostedZoneId=zoneid, StartRecordName="bar.foo.testdns.aws.com", StartRecordType="A",
-    )['ResourceRecordSets']
+        HostedZoneId=zoneid,
+        StartRecordName="bar.foo.testdns.aws.com",
+        StartRecordType="A",
+    )["ResourceRecordSets"]
     rrsets.should.have.length_of(1)
-    rrsets[0]['ResourceRecords'][0]['Value'].should.equal("5.6.7.8")
+    rrsets[0]["ResourceRecords"][0]["Value"].should.equal("5.6.7.8")
 
     rrsets = conn.list_resource_record_sets(
-        HostedZoneId=zoneid, StartRecordName="foo.bar.testdns.aws.com", StartRecordType="A",
-    )['ResourceRecordSets']
+        HostedZoneId=zoneid,
+        StartRecordName="foo.bar.testdns.aws.com",
+        StartRecordType="A",
+    )["ResourceRecordSets"]
     rrsets.should.have.length_of(2)
-    resource_records = [rr['Value'] for rr_set in rrsets for rr in rr_set['ResourceRecords']]
+    resource_records = [
+        rr["Value"] for rr_set in rrsets for rr in rr_set["ResourceRecords"]
+    ]
     resource_records.should.contain("1.2.3.4")
     resource_records.should.contain("5.6.7.8")
 
     rrsets = conn.list_resource_record_sets(
-        HostedZoneId=zoneid, StartRecordName="foo.foo.testdns.aws.com", StartRecordType="A",
-    )['ResourceRecordSets']
+        HostedZoneId=zoneid,
+        StartRecordName="foo.foo.testdns.aws.com",
+        StartRecordType="A",
+    )["ResourceRecordSets"]
     rrsets.should.have.length_of(0)
 
 
@@ -249,22 +272,26 @@ def test_rrset_with_multiple_values():
     conn.change_resource_record_sets(
         HostedZoneId=zoneid,
         ChangeBatch={
-            'Changes': [{
-                "Action": "CREATE",
-                "ResourceRecordSet": {
-                    "Name": "foo.bar.testdns.aws.com",
-                    "Type": "A",
-                    "ResourceRecords": [{"Value": "1.2.3.4"}, {"Value": "5.6.7.8"}]
+            "Changes": [
+                {
+                    "Action": "CREATE",
+                    "ResourceRecordSet": {
+                        "Name": "foo.bar.testdns.aws.com",
+                        "Type": "A",
+                        "ResourceRecords": [{"Value": "1.2.3.4"}, {"Value": "5.6.7.8"}],
+                    },
                 }
-            }]
-        }
+            ]
+        },
     )
 
-    rrsets = conn.list_resource_record_sets(HostedZoneId=zoneid, StartRecordType="A")['ResourceRecordSets']
+    rrsets = conn.list_resource_record_sets(HostedZoneId=zoneid, StartRecordType="A")[
+        "ResourceRecordSets"
+    ]
     rrsets.should.have.length_of(1)
-    set(
-        [rr['Value'] for rr in rrsets[0]['ResourceRecords']]
-    ).should.equal(set(["1.2.3.4", "5.6.7.8"]))
+    set([rr["Value"] for rr in rrsets[0]["ResourceRecords"]]).should.equal(
+        set(["1.2.3.4", "5.6.7.8"])
+    )
 
 
 @mock_route53
@@ -276,47 +303,50 @@ def test_alias_rrset():
     conn.change_resource_record_sets(
         HostedZoneId=zoneid,
         ChangeBatch={
-            'Changes': [{
-                "Action": "CREATE",
-                "ResourceRecordSet": {
-                    "Name": "foo.alias.testdns.aws.com",
-                    "Type": "A",
-                    'AliasTarget': {
-                        'HostedZoneId': 'Z3DG6IL3SJCGPX',
-                        'DNSName': 'foo.testdns.aws.com',
-                        "EvaluateTargetHealth": False,
+            "Changes": [
+                {
+                    "Action": "CREATE",
+                    "ResourceRecordSet": {
+                        "Name": "foo.alias.testdns.aws.com",
+                        "Type": "A",
+                        "AliasTarget": {
+                            "HostedZoneId": "Z3DG6IL3SJCGPX",
+                            "DNSName": "foo.testdns.aws.com",
+                            "EvaluateTargetHealth": False,
+                        },
                     },
-                }
-            }, {
-                "Action": "CREATE",
-                "ResourceRecordSet": {
-                    "Name": "bar.alias.testdns.aws.com",
-                    "Type": "CNAME",
-                    'AliasTarget': {
-                        'HostedZoneId': 'Z3DG6IL3SJCGPX',
-                        'DNSName': 'bar.testdns.aws.com',
-                        "EvaluateTargetHealth": False,
+                },
+                {
+                    "Action": "CREATE",
+                    "ResourceRecordSet": {
+                        "Name": "bar.alias.testdns.aws.com",
+                        "Type": "CNAME",
+                        "AliasTarget": {
+                            "HostedZoneId": "Z3DG6IL3SJCGPX",
+                            "DNSName": "bar.testdns.aws.com",
+                            "EvaluateTargetHealth": False,
+                        },
                     },
-                }
-            }]
-        }
+                },
+            ]
+        },
     )
 
-    rrsets = conn.list_resource_record_sets(
-        HostedZoneId=zoneid, StartRecordType="A",
-    )['ResourceRecordSets']
-    alias_targets = [rr_set['AliasTarget']['DNSName'] for rr_set in rrsets]
+    rrsets = conn.list_resource_record_sets(HostedZoneId=zoneid, StartRecordType="A",)[
+        "ResourceRecordSets"
+    ]
+    alias_targets = [rr_set["AliasTarget"]["DNSName"] for rr_set in rrsets]
     alias_targets.should.have.length_of(2)
     alias_targets.should.contain("foo.testdns.aws.com")
     alias_targets.should.contain("bar.testdns.aws.com")
-    rrsets[0]['AliasTarget']['DNSName'].should.equal("foo.testdns.aws.com")
-    rrsets[0].get('ResourceRecords', []).should.have.length_of(0)
+    rrsets[0]["AliasTarget"]["DNSName"].should.equal("foo.testdns.aws.com")
+    rrsets[0].get("ResourceRecords", []).should.have.length_of(0)
     rrsets = conn.list_resource_record_sets(
         HostedZoneId=zoneid, StartRecordType="CNAME",
-    )['ResourceRecordSets']
+    )["ResourceRecordSets"]
     rrsets.should.have.length_of(1)
-    rrsets[0]['AliasTarget']['DNSName'].should.equal("bar.testdns.aws.com")
-    rrsets[0].get('ResourceRecords', []).should.have.length_of(0)
+    rrsets[0]["AliasTarget"]["DNSName"].should.equal("bar.testdns.aws.com")
+    rrsets[0].get("ResourceRecords", []).should.have.length_of(0)
 
 
 @mock_route53
@@ -357,7 +387,9 @@ def test_delete_health_check():
     conn = boto3.client("route53", region_name="us-east-1")
 
     check = dict(
-        HealthCheckConfig=dict(IPAddress="10.0.0.25", Port=80, Type="HTTP", ResourcePath="/"),
+        HealthCheckConfig=dict(
+            IPAddress="10.0.0.25", Port=80, Type="HTTP", ResourcePath="/"
+        ),
         CallerReference="abcd",
     )
     conn.create_health_check(**check)
@@ -376,7 +408,9 @@ def test_use_health_check_in_resource_record_set():
     conn = boto3.client("route53", region_name="us-east-1")
 
     check = dict(
-        HealthCheckConfig=dict(IPAddress="10.0.0.25", Port=80, Type="HTTP", ResourcePath="/"),
+        HealthCheckConfig=dict(
+            IPAddress="10.0.0.25", Port=80, Type="HTTP", ResourcePath="/"
+        ),
         CallerReference="abcd",
     )
     check = conn.create_health_check(**check)["HealthCheck"]
@@ -388,20 +422,24 @@ def test_use_health_check_in_resource_record_set():
     conn.change_resource_record_sets(
         HostedZoneId=zoneid,
         ChangeBatch={
-            'Changes': [{
-                "Action": "CREATE",
-                "ResourceRecordSet": {
-                    "Name": "foo.bar.testdns.aws.com",
-                    "Type": "A",
-                    'ResourceRecords': [{"Value": "1.2.3.4"}],
-                    "HealthCheckId": check_id,
+            "Changes": [
+                {
+                    "Action": "CREATE",
+                    "ResourceRecordSet": {
+                        "Name": "foo.bar.testdns.aws.com",
+                        "Type": "A",
+                        "ResourceRecords": [{"Value": "1.2.3.4"}],
+                        "HealthCheckId": check_id,
+                    },
                 }
-            }]
-        }
+            ]
+        },
     )
 
-    record_sets = conn.list_resource_record_sets(HostedZoneId=zoneid)['ResourceRecordSets']
-    record_sets[0]['HealthCheckId'].should.equal(check_id)
+    record_sets = conn.list_resource_record_sets(HostedZoneId=zoneid)[
+        "ResourceRecordSets"
+    ]
+    record_sets[0]["HealthCheckId"].should.equal(check_id)
 
 
 @mock_route53
@@ -415,8 +453,11 @@ def test_hosted_zone_comment_preserved():
     )
     zone_id = firstzone["HostedZone"]["Id"].split("/")[-1]
 
-    hosted_zone = [zone for zone in conn.list_hosted_zones()['HostedZones']
-        if zone['Name'] == "testdns.aws.com."][0]
+    hosted_zone = [
+        zone
+        for zone in conn.list_hosted_zones()["HostedZones"]
+        if zone["Name"] == "testdns.aws.com."
+    ][0]
     hosted_zone["Config"]["Comment"].should.equal("test comment")
 
 
@@ -430,56 +471,61 @@ def test_deleting_weighted_route():
     conn.change_resource_record_sets(
         HostedZoneId=zone_id,
         ChangeBatch={
-            'Changes': [{
-                "Action": "CREATE",
-                "ResourceRecordSet": {
-                    "Name": "cname.testdns.aws.com",
-                    "Type": "CNAME",
-                    'ResourceRecords': [{"Value": "example.com"}],
-                    "SetIdentifier": "success-test-foo",
-                    "Weight": 50,
-                }
-            }, {
-                "Action": "CREATE",
-                "ResourceRecordSet": {
-                    "Name": "cname.testdns.aws.com",
-                    "Type": "CNAME",
-                    'ResourceRecords': [{"Value": "example.com"}],
-                    "SetIdentifier": "success-test-bar",
-                    "Weight": 50,
-                }
-            }]
-        }
+            "Changes": [
+                {
+                    "Action": "CREATE",
+                    "ResourceRecordSet": {
+                        "Name": "cname.testdns.aws.com",
+                        "Type": "CNAME",
+                        "ResourceRecords": [{"Value": "example.com"}],
+                        "SetIdentifier": "success-test-foo",
+                        "Weight": 50,
+                    },
+                },
+                {
+                    "Action": "CREATE",
+                    "ResourceRecordSet": {
+                        "Name": "cname.testdns.aws.com",
+                        "Type": "CNAME",
+                        "ResourceRecords": [{"Value": "example.com"}],
+                        "SetIdentifier": "success-test-bar",
+                        "Weight": 50,
+                    },
+                },
+            ]
+        },
     )
 
     cnames = conn.list_resource_record_sets(
-        HostedZoneId=zone_id,
-        StartRecordName="cname.testdns.aws.com.",
-    )['ResourceRecordSets']
+        HostedZoneId=zone_id, StartRecordName="cname.testdns.aws.com.",
+    )["ResourceRecordSets"]
     cnames.should.have.length_of(2)
-    foo_cname = [cname for cname in cnames if cname['SetIdentifier'] == "success-test-foo"][0]
+    foo_cname = [
+        cname for cname in cnames if cname["SetIdentifier"] == "success-test-foo"
+    ][0]
 
     conn.change_resource_record_sets(
         HostedZoneId=zone_id,
         ChangeBatch={
-            'Changes': [{
-                "Action": "DELETE",
-                "ResourceRecordSet": {
-                    "Name": "cname.testdns.aws.com",
-                    "Type": "CNAME",
-                    'ResourceRecords': [{"Value": "example.com"}],
-                    "SetIdentifier": "success-test-foo",
+            "Changes": [
+                {
+                    "Action": "DELETE",
+                    "ResourceRecordSet": {
+                        "Name": "cname.testdns.aws.com",
+                        "Type": "CNAME",
+                        "ResourceRecords": [{"Value": "example.com"}],
+                        "SetIdentifier": "success-test-foo",
+                    },
                 }
-            }]
-        }
+            ]
+        },
     )
 
     cnames = conn.list_resource_record_sets(
-        HostedZoneId=zone_id,
-        StartRecordName="cname.testdns.aws.com.",
-    )['ResourceRecordSets']
+        HostedZoneId=zone_id, StartRecordName="cname.testdns.aws.com.",
+    )["ResourceRecordSets"]
     cnames.should.have.length_of(1)
-    cnames[0]['SetIdentifier'].should.equal("success-test-bar")
+    cnames[0]["SetIdentifier"].should.equal("success-test-bar")
 
 
 @mock_route53
@@ -487,66 +533,74 @@ def test_deleting_latency_route():
     conn = boto3.client("route53", region_name="us-east-1")
 
     conn.create_hosted_zone(Name="testdns.aws.com.", CallerReference="abcd")
-    zone = [zone for zone in conn.list_hosted_zones()['HostedZones']
-        if zone['Name'] == "testdns.aws.com."][0]
-    zone_id = zone['Id']
+    zone = [
+        zone
+        for zone in conn.list_hosted_zones()["HostedZones"]
+        if zone["Name"] == "testdns.aws.com."
+    ][0]
+    zone_id = zone["Id"]
 
     conn.change_resource_record_sets(
         HostedZoneId=zone_id,
         ChangeBatch={
-            'Changes': [{
-                "Action": "CREATE",
-                "ResourceRecordSet": {
-                    "Name": "cname.testdns.aws.com",
-                    "Type": "CNAME",
-                    'ResourceRecords': [{"Value": "example.com"}],
-                    "SetIdentifier": "success-test-foo",
-                    "Region": "us-west-2",
-                }
-            }, {
-                "Action": "CREATE",
-                "ResourceRecordSet": {
-                    "Name": "cname.testdns.aws.com",
-                    "Type": "CNAME",
-                    'ResourceRecords': [{"Value": "example.com"}],
-                    "SetIdentifier": "success-test-bar",
-                    "Region": "us-west-1",
-                }
-            }]
-        }
+            "Changes": [
+                {
+                    "Action": "CREATE",
+                    "ResourceRecordSet": {
+                        "Name": "cname.testdns.aws.com",
+                        "Type": "CNAME",
+                        "ResourceRecords": [{"Value": "example.com"}],
+                        "SetIdentifier": "success-test-foo",
+                        "Region": "us-west-2",
+                    },
+                },
+                {
+                    "Action": "CREATE",
+                    "ResourceRecordSet": {
+                        "Name": "cname.testdns.aws.com",
+                        "Type": "CNAME",
+                        "ResourceRecords": [{"Value": "example.com"}],
+                        "SetIdentifier": "success-test-bar",
+                        "Region": "us-west-1",
+                    },
+                },
+            ]
+        },
     )
 
     cnames = conn.list_resource_record_sets(
-        HostedZoneId=zone_id,
-        StartRecordName="cname.testdns.aws.com.",
-    )['ResourceRecordSets']
+        HostedZoneId=zone_id, StartRecordName="cname.testdns.aws.com.",
+    )["ResourceRecordSets"]
     cnames.should.have.length_of(2)
-    foo_cname = [cname for cname in cnames if cname['SetIdentifier'] == "success-test-foo"][0]
-    foo_cname['Region'].should.equal("us-west-2")
+    foo_cname = [
+        cname for cname in cnames if cname["SetIdentifier"] == "success-test-foo"
+    ][0]
+    foo_cname["Region"].should.equal("us-west-2")
 
     conn.change_resource_record_sets(
         HostedZoneId=zone_id,
         ChangeBatch={
-            'Changes': [{
-                "Action": "DELETE",
-                "ResourceRecordSet": {
-                    "Name": "cname.testdns.aws.com",
-                    "Type": "CNAME",
-                    "SetIdentifier": "success-test-foo",
-                    "Region": "us-west-2",
+            "Changes": [
+                {
+                    "Action": "DELETE",
+                    "ResourceRecordSet": {
+                        "Name": "cname.testdns.aws.com",
+                        "Type": "CNAME",
+                        "SetIdentifier": "success-test-foo",
+                        "Region": "us-west-2",
+                    },
                 }
-            }]
-        }
+            ]
+        },
     )
 
     cnames = conn.list_resource_record_sets(
-        HostedZoneId=zone_id,
-        StartRecordName="cname.testdns.aws.com.",
-    )['ResourceRecordSets']
+        HostedZoneId=zone_id, StartRecordName="cname.testdns.aws.com.",
+    )["ResourceRecordSets"]
     cnames.should.have.length_of(1)
     cname = cnames[0]
-    cname['SetIdentifier'].should.equal("success-test-bar")
-    cname['Region'].should.equal("us-west-1")
+    cname["SetIdentifier"].should.equal("success-test-bar")
+    cname["Region"].should.equal("us-west-1")
 
 
 @mock_route53
@@ -555,19 +609,13 @@ def test_hosted_zone_private_zone_preserved():
 
     firstzone = conn.create_hosted_zone(
         Name="testdns.aws.com.",
-        HostedZoneConfig=dict(
-            PrivateZone=True,
-            Comment="some comment",
-        ),
-        VPC=dict(
-            VPCId="vpc-fake",
-            VPCRegion="us-east-1",
-        ),
+        HostedZoneConfig=dict(PrivateZone=True, Comment="some comment",),
+        VPC=dict(VPCId="vpc-fake", VPCRegion="us-east-1",),
         CallerReference="abcd",
     )
     zone_id = firstzone["HostedZone"]["Id"].split("/")[-1]
 
-    hosted_zone = conn.list_hosted_zones()['HostedZones'][0]
+    hosted_zone = conn.list_hosted_zones()["HostedZones"][0]
     # in (original) boto, these bools returned as strings.
     hosted_zone["Config"]["PrivateZone"].should.equal(True)
 
