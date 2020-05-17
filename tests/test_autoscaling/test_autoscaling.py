@@ -13,7 +13,6 @@ from nose.tools import assert_raises
 from moto import (
     mock_autoscaling,
     mock_ec2_deprecated,
-    mock_elb_deprecated,
     mock_elb,
     mock_autoscaling_deprecated,
     mock_ec2,
@@ -25,73 +24,6 @@ from utils import (
     setup_networking_deprecated,
     setup_instance_with_networking,
 )
-
-
-@mock_autoscaling_deprecated
-@mock_elb_deprecated
-def test_create_autoscaling_group():
-    mocked_networking = setup_networking_deprecated()
-    elb_conn = boto.ec2.elb.connect_to_region("us-east-1")
-    elb_conn.create_load_balancer("test_lb", zones=[], listeners=[(80, 8080, "http")])
-
-    conn = boto.ec2.autoscale.connect_to_region("us-east-1")
-    config = LaunchConfiguration(
-        name="tester", image_id="ami-abcd1234", instance_type="t2.medium"
-    )
-    conn.create_launch_configuration(config)
-
-    group = AutoScalingGroup(
-        name="tester_group",
-        availability_zones=["us-east-1a", "us-east-1b"],
-        default_cooldown=60,
-        desired_capacity=2,
-        health_check_period=100,
-        health_check_type="EC2",
-        max_size=2,
-        min_size=2,
-        launch_config=config,
-        load_balancers=["test_lb"],
-        placement_group="test_placement",
-        vpc_zone_identifier="{subnet1},{subnet2}".format(
-            subnet1=mocked_networking["subnet1"], subnet2=mocked_networking["subnet2"]
-        ),
-        termination_policies=["OldestInstance", "NewestInstance"],
-        tags=[
-            Tag(
-                resource_id="tester_group",
-                key="test_key",
-                value="test_value",
-                propagate_at_launch=True,
-            )
-        ],
-    )
-    conn.create_auto_scaling_group(group)
-
-    group = conn.get_all_groups()[0]
-    group.name.should.equal("tester_group")
-    set(group.availability_zones).should.equal(set(["us-east-1a", "us-east-1b"]))
-    group.desired_capacity.should.equal(2)
-    group.max_size.should.equal(2)
-    group.min_size.should.equal(2)
-    group.instances.should.have.length_of(2)
-    group.vpc_zone_identifier.should.equal(
-        "{subnet1},{subnet2}".format(
-            subnet1=mocked_networking["subnet1"], subnet2=mocked_networking["subnet2"]
-        )
-    )
-    group.launch_config_name.should.equal("tester")
-    group.default_cooldown.should.equal(60)
-    group.health_check_period.should.equal(100)
-    group.health_check_type.should.equal("EC2")
-    list(group.load_balancers).should.equal(["test_lb"])
-    group.placement_group.should.equal("test_placement")
-    list(group.termination_policies).should.equal(["OldestInstance", "NewestInstance"])
-    len(list(group.tags)).should.equal(1)
-    tag = list(group.tags)[0]
-    tag.resource_id.should.equal("tester_group")
-    tag.key.should.equal("test_key")
-    tag.value.should.equal("test_value")
-    tag.propagate_at_launch.should.equal(True)
 
 
 @mock_autoscaling_deprecated
@@ -460,57 +392,6 @@ def test_set_desired_capacity_the_same():
 
     instances = list(conn.get_all_autoscaling_instances())
     instances.should.have.length_of(2)
-
-
-@mock_autoscaling_deprecated
-@mock_elb_deprecated
-def test_autoscaling_group_with_elb():
-    mocked_networking = setup_networking_deprecated()
-    elb_conn = boto.connect_elb()
-    zones = ["us-east-1a", "us-east-1b"]
-    ports = [(80, 8080, "http"), (443, 8443, "tcp")]
-    lb = elb_conn.create_load_balancer("my-lb", zones, ports)
-    instances_health = elb_conn.describe_instance_health("my-lb")
-    instances_health.should.be.empty
-
-    conn = boto.connect_autoscale()
-    config = LaunchConfiguration(
-        name="tester", image_id="ami-abcd1234", instance_type="t2.medium"
-    )
-    conn.create_launch_configuration(config)
-    group = AutoScalingGroup(
-        name="tester_group",
-        max_size=2,
-        min_size=2,
-        launch_config=config,
-        load_balancers=["my-lb"],
-        vpc_zone_identifier=mocked_networking["subnet1"],
-    )
-    conn.create_auto_scaling_group(group)
-    group = conn.get_all_groups()[0]
-    elb = elb_conn.get_all_load_balancers()[0]
-    group.desired_capacity.should.equal(2)
-    elb.instances.should.have.length_of(2)
-
-    autoscale_instance_ids = set(instance.instance_id for instance in group.instances)
-    elb_instace_ids = set(instance.id for instance in elb.instances)
-    autoscale_instance_ids.should.equal(elb_instace_ids)
-
-    conn.set_desired_capacity("tester_group", 3)
-    group = conn.get_all_groups()[0]
-    elb = elb_conn.get_all_load_balancers()[0]
-    group.desired_capacity.should.equal(3)
-    elb.instances.should.have.length_of(3)
-
-    autoscale_instance_ids = set(instance.instance_id for instance in group.instances)
-    elb_instace_ids = set(instance.id for instance in elb.instances)
-    autoscale_instance_ids.should.equal(elb_instace_ids)
-
-    conn.delete_auto_scaling_group("tester_group")
-    conn.get_all_groups().should.have.length_of(0)
-    elb = elb_conn.get_all_load_balancers()[0]
-    elb.instances.should.have.length_of(0)
-
 
 """
 Boto3

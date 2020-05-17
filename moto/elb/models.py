@@ -269,7 +269,7 @@ class ELBBackend(BaseBackend):
         name,
         zones,
         ports,
-        scheme="internet-facing",
+        scheme=None,
         subnets=None,
         security_groups=None,
     ):
@@ -291,7 +291,7 @@ class ELBBackend(BaseBackend):
             name=name,
             zones=zones,
             ports=ports,
-            scheme=scheme,
+            scheme=scheme if scheme else "internet-facing",
             subnets=subnets,
             security_groups=security_groups,
             vpc_id=vpc_id,

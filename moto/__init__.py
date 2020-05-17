@@ -45,7 +45,6 @@ mock_ec2_instance_connect = lazy_load(
 mock_ecr = lazy_load(".ecr", "mock_ecr")
 mock_ecs = lazy_load(".ecs", "mock_ecs")
 mock_elb = lazy_load(".elb", "mock_elb")
-mock_elb_deprecated = lazy_load(".elb", "mock_elb_deprecated")
 mock_elbv2 = lazy_load(".elbv2", "mock_elbv2")
 mock_emr = lazy_load(".emr", "mock_emr")
 mock_events = lazy_load(".events", "mock_events")
