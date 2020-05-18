@@ -7,9 +7,8 @@ import boto3
 import sure  # noqa
 
 from nose.tools import assert_raises
-from boto.exception import BotoServerError
 from botocore.exceptions import ClientError
-from moto import mock_iam, mock_iam_deprecated
+from moto import mock_iam
 from moto.core import ACCOUNT_ID
 
 MOCK_POLICY = """
@@ -25,24 +24,24 @@ MOCK_POLICY = """
 """
 
 
-@mock_iam_deprecated()
+@mock_iam
 def test_create_group():
-    conn = boto.connect_iam()
-    conn.create_group("my-group")
-    with assert_raises(BotoServerError):
-        conn.create_group("my-group")
+    conn = boto3.client("iam", region_name="us-east-1")
+    conn.create_group(GroupName="my-group")
+    with assert_raises(ClientError):
+        conn.create_group(GroupName="my-group")
 
 
-@mock_iam_deprecated()
+@mock_iam
 def test_get_group():
-    conn = boto.connect_iam()
-    conn.create_group("my-group")
-    conn.get_group("my-group")
-    with assert_raises(BotoServerError):
-        conn.get_group("not-group")
+    conn = boto3.client("iam", region_name="us-east-1")
+    conn.create_group(GroupName="my-group")
+    conn.get_group(GroupName="my-group")
+    with assert_raises(ClientError):
+        conn.get_group(GroupName="not-group")
 
 
-@mock_iam()
+@mock_iam
 def test_get_group_current():
     conn = boto3.client("iam", region_name="us-east-1")
     conn.create_group(GroupName="my-group")
@@ -63,63 +62,60 @@ def test_get_group_current():
     ] == "arn:aws:iam::{}:group/some/location/my-other-group".format(ACCOUNT_ID)
 
 
-@mock_iam_deprecated()
+@mock_iam
 def test_get_all_groups():
-    conn = boto.connect_iam()
-    conn.create_group("my-group1")
-    conn.create_group("my-group2")
-    groups = conn.get_all_groups()["list_groups_response"]["list_groups_result"][
-        "groups"
-    ]
+    conn = boto3.client("iam", region_name="us-east-1")
+    conn.create_group(GroupName="my-group1")
+    conn.create_group(GroupName="my-group2")
+    groups = conn.list_groups()["Groups"]
     groups.should.have.length_of(2)
 
 
-@mock_iam_deprecated()
+@mock_iam
 def test_add_user_to_group():
-    conn = boto.connect_iam()
-    with assert_raises(BotoServerError):
-        conn.add_user_to_group("my-group", "my-user")
-    conn.create_group("my-group")
-    with assert_raises(BotoServerError):
-        conn.add_user_to_group("my-group", "my-user")
-    conn.create_user("my-user")
-    conn.add_user_to_group("my-group", "my-user")
+    conn = boto3.client("iam", region_name="us-east-1")
+    with assert_raises(ClientError):
+        conn.add_user_to_group(GroupName="my-group", UserName="my-user")
+    conn.create_group(GroupName="my-group")
+    with assert_raises(ClientError):
+        conn.add_user_to_group(GroupName="my-group", UserName="my-user")
+    conn.create_user(UserName="my-user")
+    conn.add_user_to_group(GroupName="my-group", UserName="my-user")
 
 
-@mock_iam_deprecated()
+@mock_iam
 def test_remove_user_from_group():
-    conn = boto.connect_iam()
-    with assert_raises(BotoServerError):
-        conn.remove_user_from_group("my-group", "my-user")
-    conn.create_group("my-group")
-    conn.create_user("my-user")
-    with assert_raises(BotoServerError):
-        conn.remove_user_from_group("my-group", "my-user")
-    conn.add_user_to_group("my-group", "my-user")
-    conn.remove_user_from_group("my-group", "my-user")
+    conn = boto3.client("iam", region_name="us-east-1")
+    with assert_raises(ClientError):
+        conn.remove_user_from_group(GroupName="my-group", UserName="my-user")
+    conn.create_group(GroupName="my-group")
+    conn.create_user(UserName="my-user")
+    with assert_raises(ClientError):
+        conn.remove_user_from_group(GroupName="my-group", UserName="my-user")
+    conn.add_user_to_group(GroupName="my-group", UserName="my-user")
+    conn.remove_user_from_group(GroupName="my-group", UserName="my-user")
 
 
-@mock_iam_deprecated()
+@mock_iam
 def test_get_groups_for_user():
-    conn = boto.connect_iam()
-    conn.create_group("my-group1")
-    conn.create_group("my-group2")
-    conn.create_group("other-group")
-    conn.create_user("my-user")
-    conn.add_user_to_group("my-group1", "my-user")
-    conn.add_user_to_group("my-group2", "my-user")
+    conn = boto3.client("iam", region_name="us-east-1")
+    conn.create_group(GroupName="my-group1")
+    conn.create_group(GroupName="my-group2")
+    conn.create_group(GroupName="other-group")
+    conn.create_user(UserName="my-user")
+    conn.add_user_to_group(GroupName="my-group1", UserName="my-user")
+    conn.add_user_to_group(GroupName="my-group2", UserName="my-user")
 
-    groups = conn.get_groups_for_user("my-user")["list_groups_for_user_response"][
-        "list_groups_for_user_result"
-    ]["groups"]
+    groups = conn.list_groups_for_user(UserName="my-user")["Groups"]
     groups.should.have.length_of(2)
 
 
-@mock_iam_deprecated()
+@mock_iam
 def test_put_group_policy():
-    conn = boto.connect_iam()
-    conn.create_group("my-group")
-    conn.put_group_policy("my-group", "my-policy", MOCK_POLICY)
+    conn = boto3.client("iam", region_name="us-east-1")
+    conn.create_group(GroupName="my-group")
+    conn.put_group_policy(GroupName="my-group", PolicyName="my-policy",
+        PolicyDocument=MOCK_POLICY)
 
 
 @mock_iam
@@ -146,29 +142,25 @@ def test_attach_group_policies():
     ].should.be.empty
 
 
-@mock_iam_deprecated()
+@mock_iam
 def test_get_group_policy():
-    conn = boto.connect_iam()
-    conn.create_group("my-group")
-    with assert_raises(BotoServerError):
-        conn.get_group_policy("my-group", "my-policy")
+    conn = boto3.client("iam", region_name="us-east-1")
+    conn.create_group(GroupName="my-group")
+    with assert_raises(ClientError):
+        conn.get_group_policy(GroupName="my-group", PolicyName="my-policy")
 
-    conn.put_group_policy("my-group", "my-policy", MOCK_POLICY)
-    conn.get_group_policy("my-group", "my-policy")
+    conn.put_group_policy(GroupName="my-group", PolicyName="my-policy", PolicyDocument=MOCK_POLICY)
+    conn.get_group_policy(GroupName="my-group", PolicyName="my-policy")
 
 
-@mock_iam_deprecated()
+@mock_iam
 def test_get_all_group_policies():
-    conn = boto.connect_iam()
-    conn.create_group("my-group")
-    policies = conn.get_all_group_policies("my-group")["list_group_policies_response"][
-        "list_group_policies_result"
-    ]["policy_names"]
+    conn = boto3.client("iam", region_name="us-east-1")
+    conn.create_group(GroupName="my-group")
+    policies = conn.list_group_policies(GroupName="my-group")["PolicyNames"]
     assert policies == []
-    conn.put_group_policy("my-group", "my-policy", MOCK_POLICY)
-    policies = conn.get_all_group_policies("my-group")["list_group_policies_response"][
-        "list_group_policies_result"
-    ]["policy_names"]
+    conn.put_group_policy(GroupName="my-group", PolicyName="my-policy", PolicyDocument=MOCK_POLICY)
+    policies = conn.list_group_policies(GroupName="my-group")["PolicyNames"]
     assert policies == ["my-policy"]
 
 
