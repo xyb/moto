@@ -78,12 +78,16 @@ MOCK_POLICY_3 = """
 def test_get_all_server_certs():
     conn = boto3.client("iam", region_name="us-east-1")
 
-    conn.upload_server_certificate(ServerCertificateName="certname", CertificateBody="certbody", PrivateKey="privatekey")
+    conn.upload_server_certificate(
+        ServerCertificateName="certname",
+        CertificateBody="certbody",
+        PrivateKey="privatekey",
+    )
     certs = conn.list_server_certificates()["ServerCertificateMetadataList"]
     certs.should.have.length_of(1)
     cert1 = certs[0]
-    cert1['ServerCertificateName'].should.equal("certname")
-    cert1['Arn'].should.equal(
+    cert1["ServerCertificateName"].should.equal("certname")
+    cert1["Arn"].should.equal(
         "arn:aws:iam::{}:server-certificate/certname".format(ACCOUNT_ID)
     )
 
@@ -100,12 +104,16 @@ def test_get_server_cert_doesnt_exist():
 def test_get_server_cert():
     conn = boto3.client("iam", region_name="us-east-1")
 
-    conn.upload_server_certificate(ServerCertificateName="certname", CertificateBody="certbody", PrivateKey="privatekey")
-    cert = conn.get_server_certificate(
-        ServerCertificateName="certname"
-    )['ServerCertificate']['ServerCertificateMetadata']
-    cert['ServerCertificateName'].should.equal("certname")
-    cert['Arn'].should.equal(
+    conn.upload_server_certificate(
+        ServerCertificateName="certname",
+        CertificateBody="certbody",
+        PrivateKey="privatekey",
+    )
+    cert = conn.get_server_certificate(ServerCertificateName="certname")[
+        "ServerCertificate"
+    ]["ServerCertificateMetadata"]
+    cert["ServerCertificateName"].should.equal("certname")
+    cert["Arn"].should.equal(
         "arn:aws:iam::{}:server-certificate/certname".format(ACCOUNT_ID)
     )
 
@@ -114,12 +122,16 @@ def test_get_server_cert():
 def test_upload_server_certificate():
     conn = boto3.client("iam", region_name="us-east-1")
 
-    conn.upload_server_certificate(ServerCertificateName="certname", CertificateBody="certbody", PrivateKey="privatekey")
-    cert = conn.get_server_certificate(
+    conn.upload_server_certificate(
         ServerCertificateName="certname",
-    )['ServerCertificate']['ServerCertificateMetadata']
-    cert['ServerCertificateName'].should.equal("certname")
-    cert['Arn'].should.equal(
+        CertificateBody="certbody",
+        PrivateKey="privatekey",
+    )
+    cert = conn.get_server_certificate(ServerCertificateName="certname",)[
+        "ServerCertificate"
+    ]["ServerCertificateMetadata"]
+    cert["ServerCertificateName"].should.equal("certname")
+    cert["Arn"].should.equal(
         "arn:aws:iam::{}:server-certificate/certname".format(ACCOUNT_ID)
     )
 
@@ -128,7 +140,11 @@ def test_upload_server_certificate():
 def test_delete_server_cert():
     conn = boto3.client("iam", region_name="us-east-1")
 
-    conn.upload_server_certificate(ServerCertificateName="certname", CertificateBody="certbody", PrivateKey="privatekey")
+    conn.upload_server_certificate(
+        ServerCertificateName="certname",
+        CertificateBody="certbody",
+        PrivateKey="privatekey",
+    )
     conn.get_server_certificate(ServerCertificateName="certname")
     conn.delete_server_certificate(ServerCertificateName="certname")
     with assert_raises(ClientError):
@@ -161,23 +177,29 @@ def test_create_role_and_instance_profile():
         RoleName="my-role", AssumeRolePolicyDocument="some policy", Path="my-path"
     )
 
-    conn.add_role_to_instance_profile(InstanceProfileName="my-profile", RoleName="my-role")
+    conn.add_role_to_instance_profile(
+        InstanceProfileName="my-profile", RoleName="my-role"
+    )
 
-    role = conn.get_role(RoleName="my-role")['Role']
-    role['Path'].should.equal("my-path")
-    role['AssumeRolePolicyDocument'].should.equal("some policy")
+    role = conn.get_role(RoleName="my-role")["Role"]
+    role["Path"].should.equal("my-path")
+    role["AssumeRolePolicyDocument"].should.equal("some policy")
 
-    profile = conn.get_instance_profile(InstanceProfileName="my-profile")['InstanceProfile']
-    profile['Path'].should.equal("my-path")
-    role_from_profile = profile['Roles'][0]
-    role_from_profile["RoleId"].should.equal(role['RoleId'])
+    profile = conn.get_instance_profile(InstanceProfileName="my-profile")[
+        "InstanceProfile"
+    ]
+    profile["Path"].should.equal("my-path")
+    role_from_profile = profile["Roles"][0]
+    role_from_profile["RoleId"].should.equal(role["RoleId"])
     role_from_profile["RoleName"].should.equal("my-role")
 
-    conn.list_roles()['Roles'][0]['RoleName'].should.equal("my-role")
+    conn.list_roles()["Roles"][0]["RoleName"].should.equal("my-role")
 
     # Test with an empty path:
-    profile = conn.create_instance_profile(InstanceProfileName="my-other-profile")['InstanceProfile']
-    profile['Path'].should.equal("/")
+    profile = conn.create_instance_profile(InstanceProfileName="my-other-profile")[
+        "InstanceProfile"
+    ]
+    profile["Path"].should.equal("/")
 
 
 @mock_iam
@@ -195,16 +217,24 @@ def test_remove_role_from_instance_profile():
     conn.create_role(
         RoleName="my-role", AssumeRolePolicyDocument="some policy", Path="my-path"
     )
-    conn.add_role_to_instance_profile(InstanceProfileName="my-profile", RoleName="my-role")
+    conn.add_role_to_instance_profile(
+        InstanceProfileName="my-profile", RoleName="my-role"
+    )
 
-    profile = conn.get_instance_profile(InstanceProfileName="my-profile")['InstanceProfile']
-    role_from_profile = profile['Roles'][0]
+    profile = conn.get_instance_profile(InstanceProfileName="my-profile")[
+        "InstanceProfile"
+    ]
+    role_from_profile = profile["Roles"][0]
     role_from_profile["RoleName"].should.equal("my-role")
 
-    conn.remove_role_from_instance_profile(InstanceProfileName="my-profile", RoleName="my-role")
+    conn.remove_role_from_instance_profile(
+        InstanceProfileName="my-profile", RoleName="my-role"
+    )
 
-    profile = conn.get_instance_profile(InstanceProfileName="my-profile")['InstanceProfile']
-    dict(profile['Roles']).should.be.empty
+    profile = conn.get_instance_profile(InstanceProfileName="my-profile")[
+        "InstanceProfile"
+    ]
+    dict(profile["Roles"]).should.be.empty
 
 
 @mock_iam()
@@ -299,15 +329,19 @@ def test_delete_role():
 def test_list_instance_profiles():
     conn = boto3.client("iam", region_name="us-east-1")
     conn.create_instance_profile(InstanceProfileName="my-profile", Path="my-path")
-    conn.create_role(RoleName="my-role", Path="my-path", AssumeRolePolicyDocument="foobar")
+    conn.create_role(
+        RoleName="my-role", Path="my-path", AssumeRolePolicyDocument="foobar"
+    )
 
-    conn.add_role_to_instance_profile(InstanceProfileName="my-profile", RoleName="my-role")
+    conn.add_role_to_instance_profile(
+        InstanceProfileName="my-profile", RoleName="my-role"
+    )
 
-    profiles = conn.list_instance_profiles()['InstanceProfiles']
+    profiles = conn.list_instance_profiles()["InstanceProfiles"]
 
     len(profiles).should.equal(1)
-    profiles[0]['InstanceProfileName'].should.equal("my-profile")
-    profiles[0]['Roles'][0]['RoleName'].should.equal("my-role")
+    profiles[0]["InstanceProfileName"].should.equal("my-profile")
+    profiles[0]["Roles"][0]["RoleName"].should.equal("my-role")
 
 
 @mock_iam
@@ -318,9 +352,7 @@ def test_list_instance_profiles_for_role():
         RoleName="my-role", AssumeRolePolicyDocument="some policy", Path="my-path"
     )
     conn.create_role(
-        RoleName="my-role2",
-        AssumeRolePolicyDocument="some policy2",
-        Path="my-path2",
+        RoleName="my-role2", AssumeRolePolicyDocument="some policy2", Path="my-path2",
     )
 
     profile_name_list = ["my-profile", "my-profile2"]
@@ -328,13 +360,12 @@ def test_list_instance_profiles_for_role():
     for profile_count in range(0, 2):
         conn.create_instance_profile(
             InstanceProfileName=profile_name_list[profile_count],
-            Path=profile_path_list[profile_count]
+            Path=profile_path_list[profile_count],
         )
 
     for profile_count in range(0, 2):
         conn.add_role_to_instance_profile(
-            InstanceProfileName=profile_name_list[profile_count],
-            RoleName="my-role",
+            InstanceProfileName=profile_name_list[profile_count], RoleName="my-role",
         )
 
     profile_dump = conn.list_instance_profiles_for_role(RoleName="my-role")
@@ -342,9 +373,7 @@ def test_list_instance_profiles_for_role():
     for profile_count in range(0, len(profile_list)):
         profile_name_list.remove(profile_list[profile_count]["InstanceProfileName"])
         profile_path_list.remove(profile_list[profile_count]["Path"])
-        profile_list[profile_count]["Roles"][0]["RoleName"].should.equal(
-            "my-role"
-        )
+        profile_list[profile_count]["Roles"][0]["RoleName"].should.equal("my-role")
 
     len(profile_name_list).should.equal(0)
     len(profile_path_list).should.equal(0)
@@ -358,19 +387,23 @@ def test_list_instance_profiles_for_role():
 def test_list_role_policies():
     conn = boto3.client("iam", region_name="us-east-1")
     conn.create_role(RoleName="my-role", AssumeRolePolicyDocument="assumePolicy")
-    conn.put_role_policy(RoleName="my-role", PolicyName="test policy", PolicyDocument=MOCK_POLICY)
+    conn.put_role_policy(
+        RoleName="my-role", PolicyName="test policy", PolicyDocument=MOCK_POLICY
+    )
     role = conn.list_role_policies(RoleName="my-role")
-    role['PolicyNames'].should.have.length_of(1)
-    role['PolicyNames'][0].should.equal("test policy")
+    role["PolicyNames"].should.have.length_of(1)
+    role["PolicyNames"][0].should.equal("test policy")
 
-    conn.put_role_policy(RoleName="my-role", PolicyName="test policy 2", PolicyDocument=MOCK_POLICY)
+    conn.put_role_policy(
+        RoleName="my-role", PolicyName="test policy 2", PolicyDocument=MOCK_POLICY
+    )
     role = conn.list_role_policies(RoleName="my-role")
-    role['PolicyNames'].should.have.length_of(2)
+    role["PolicyNames"].should.have.length_of(2)
 
     conn.delete_role_policy(RoleName="my-role", PolicyName="test policy")
     role = conn.list_role_policies(RoleName="my-role")
-    role['PolicyNames'].should.have.length_of(1)
-    role['PolicyNames'][0].should.equal("test policy 2")
+    role["PolicyNames"].should.have.length_of(1)
+    role["PolicyNames"][0].should.equal("test policy 2")
 
     with assert_raises(ClientError):
         conn.delete_role_policy(RoleName="my-role", PolicyName="test policy")
@@ -382,10 +415,12 @@ def test_put_role_policy():
     conn.create_role(
         RoleName="my-role", AssumeRolePolicyDocument="some policy", Path="my-path"
     )
-    conn.put_role_policy(RoleName="my-role", PolicyName="test policy", PolicyDocument=MOCK_POLICY)
-    policy = conn.get_role_policy(
-        RoleName="my-role", PolicyName="test policy"
-    )["PolicyName"]
+    conn.put_role_policy(
+        RoleName="my-role", PolicyName="test policy", PolicyDocument=MOCK_POLICY
+    )
+    policy = conn.get_role_policy(RoleName="my-role", PolicyName="test policy")[
+        "PolicyName"
+    ]
     policy.should.equal("test policy")
 
 
@@ -404,8 +439,8 @@ def test_update_assume_role_policy():
     conn = boto3.client("iam", region_name="us-east-1")
     role = conn.create_role(RoleName="my-role", AssumeRolePolicyDocument="assumePolicy")
     conn.update_assume_role_policy(RoleName="my-role", PolicyDocument="my-policy")
-    role = conn.get_role(RoleName="my-role")['Role']
-    role['AssumeRolePolicyDocument'].should.equal("my-policy")
+    role = conn.get_role(RoleName="my-role")["Role"]
+    role["AssumeRolePolicyDocument"].should.equal("my-policy")
 
 
 @mock_iam
@@ -824,15 +859,12 @@ def test_get_all_access_keys():
     conn.create_user(UserName="my-user")
     response = conn.list_access_keys(UserName="my-user")
     assert_equals(
-        response["AccessKeyMetadata"],
-        [],
+        response["AccessKeyMetadata"], [],
     )
     conn.create_access_key(UserName="my-user")
     response = conn.list_access_keys(UserName="my-user")
     assert_equals(
-        sorted(
-            response["AccessKeyMetadata"][0].keys()
-        ),
+        sorted(response["AccessKeyMetadata"][0].keys()),
         sorted(["Status", "CreateDate", "UserName", "AccessKeyId"]),
     )
 
@@ -1161,10 +1193,7 @@ def test_get_credential_report():
     with assert_raises(ClientError):
         conn.get_credential_report()
     result = conn.generate_credential_report()
-    while (
-        result["State"]
-        != "COMPLETE"
-    ):
+    while result["State"] != "COMPLETE":
         result = conn.generate_credential_report()
     result = conn.get_credential_report()
     report = result["Content"].decode("ascii")
@@ -1271,9 +1300,7 @@ def test_managed_policy():
     )
 
     user_policies = conn.list_policies(Scope="Local")["Policies"]
-    set(["UserManagedPolicy"]).should.equal(
-        set(p["PolicyName"] for p in user_policies)
-    )
+    set(["UserManagedPolicy"]).should.equal(set(p["PolicyName"] for p in user_policies))
 
     marker = 0
     all_policies = []
@@ -1287,9 +1314,7 @@ def test_managed_policy():
     )
 
     RoleName = "my-role"
-    conn.create_role(
-        RoleName=RoleName, AssumeRolePolicyDocument="test", Path="my-path"
-    )
+    conn.create_role(RoleName=RoleName, AssumeRolePolicyDocument="test", Path="my-path")
     for PolicyName in [
         "AmazonElasticMapReduceRole",
         "AmazonElasticMapReduceforEC2Role",
@@ -1302,9 +1327,7 @@ def test_managed_policy():
     for x in rows:
         int(x["AttachmentCount"]).should.be.greater_than(0)
 
-    resp = conn.list_attached_role_policies(
-        RoleName=RoleName,
-    )
+    resp = conn.list_attached_role_policies(RoleName=RoleName,)
     resp["AttachedPolicies"].should.have.length_of(2)
 
     conn.detach_role_policy(
@@ -1316,9 +1339,7 @@ def test_managed_policy():
     for x in rows:
         int(x["AttachmentCount"]).should.be.greater_than(0)
 
-    resp = conn.list_attached_role_policies(
-        RoleName=RoleName,
-    )
+    resp = conn.list_attached_role_policies(RoleName=RoleName,)
     resp["AttachedPolicies"].should.have.length_of(1)
 
     with assert_raises(ClientError):
@@ -1329,8 +1350,7 @@ def test_managed_policy():
 
     with assert_raises(ClientError):
         conn.detach_role_policy(
-            PolicyArn="arn:aws:iam::aws:policy/Nonexistent",
-            RoleName=RoleName,
+            PolicyArn="arn:aws:iam::aws:policy/Nonexistent", RoleName=RoleName,
         )
 
 

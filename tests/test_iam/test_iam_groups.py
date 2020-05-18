@@ -114,8 +114,9 @@ def test_get_groups_for_user():
 def test_put_group_policy():
     conn = boto3.client("iam", region_name="us-east-1")
     conn.create_group(GroupName="my-group")
-    conn.put_group_policy(GroupName="my-group", PolicyName="my-policy",
-        PolicyDocument=MOCK_POLICY)
+    conn.put_group_policy(
+        GroupName="my-group", PolicyName="my-policy", PolicyDocument=MOCK_POLICY
+    )
 
 
 @mock_iam
@@ -149,7 +150,9 @@ def test_get_group_policy():
     with assert_raises(ClientError):
         conn.get_group_policy(GroupName="my-group", PolicyName="my-policy")
 
-    conn.put_group_policy(GroupName="my-group", PolicyName="my-policy", PolicyDocument=MOCK_POLICY)
+    conn.put_group_policy(
+        GroupName="my-group", PolicyName="my-policy", PolicyDocument=MOCK_POLICY
+    )
     conn.get_group_policy(GroupName="my-group", PolicyName="my-policy")
 
 
@@ -159,7 +162,9 @@ def test_get_all_group_policies():
     conn.create_group(GroupName="my-group")
     policies = conn.list_group_policies(GroupName="my-group")["PolicyNames"]
     assert policies == []
-    conn.put_group_policy(GroupName="my-group", PolicyName="my-policy", PolicyDocument=MOCK_POLICY)
+    conn.put_group_policy(
+        GroupName="my-group", PolicyName="my-policy", PolicyDocument=MOCK_POLICY
+    )
     policies = conn.list_group_policies(GroupName="my-group")["PolicyNames"]
     assert policies == ["my-policy"]
 
