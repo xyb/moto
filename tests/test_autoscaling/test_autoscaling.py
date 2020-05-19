@@ -12,58 +12,55 @@ from nose.tools import assert_raises
 
 from moto import (
     mock_autoscaling,
-    mock_ec2_deprecated,
     mock_elb,
-    mock_autoscaling_deprecated,
     mock_ec2,
 )
 from tests.helpers import requires_boto_gte
 
 from utils import (
     setup_networking,
-    setup_networking_deprecated,
     setup_instance_with_networking,
 )
 
 
-@mock_autoscaling_deprecated
+@mock_autoscaling
 def test_create_autoscaling_groups_defaults():
     """ Test with the minimum inputs and check that all of the proper defaults
     are assigned for the other attributes """
 
-    mocked_networking = setup_networking_deprecated()
-    conn = boto.connect_autoscale()
-    config = LaunchConfiguration(
-        name="tester", image_id="ami-abcd1234", instance_type="t2.medium"
+    mocked_networking = setup_networking()
+    conn = boto3.client("autoscaling", region_name="us-east-1")
+    config = dict(
+        LaunchConfigurationName="tester", ImageId="ami-abcd1234", InstanceType="t2.medium"
     )
-    conn.create_launch_configuration(config)
+    conn.create_launch_configuration(**config)
 
-    group = AutoScalingGroup(
-        name="tester_group",
-        max_size=2,
-        min_size=2,
-        launch_config=config,
-        vpc_zone_identifier=mocked_networking["subnet1"],
+    group = dict(
+        AutoScalingGroupName="tester_group",
+        MaxSize=2,
+        MinSize=2,
+        LaunchConfigurationName="tester",
+        VPCZoneIdentifier=mocked_networking["subnet1"],
     )
-    conn.create_auto_scaling_group(group)
+    conn.create_auto_scaling_group(**group)
 
-    group = conn.get_all_groups()[0]
-    group.name.should.equal("tester_group")
-    group.max_size.should.equal(2)
-    group.min_size.should.equal(2)
-    group.launch_config_name.should.equal("tester")
+    group = conn.describe_auto_scaling_groups()["AutoScalingGroups"][0]
+    group["AutoScalingGroupName"].should.equal("tester_group")
+    group["MaxSize"].should.equal(2)
+    group["MinSize"].should.equal(2)
+    group["LaunchConfigurationName"].should.equal("tester")
 
     # Defaults
-    list(group.availability_zones).should.equal(["us-east-1a"])  # subnet1
-    group.desired_capacity.should.equal(2)
-    group.vpc_zone_identifier.should.equal(mocked_networking["subnet1"])
-    group.default_cooldown.should.equal(300)
-    group.health_check_period.should.equal(300)
-    group.health_check_type.should.equal("EC2")
-    list(group.load_balancers).should.equal([])
-    group.placement_group.should.equal(None)
-    list(group.termination_policies).should.equal([])
-    list(group.tags).should.equal([])
+    list(group["AvailabilityZones"]).should.equal(["us-east-1a"])  # subnet1
+    group["DesiredCapacity"].should.equal(2)
+    group["VPCZoneIdentifier"].should.equal(mocked_networking["subnet1"])
+    group["DefaultCooldown"].should.equal(300)
+    group["HealthCheckGracePeriod"].should.equal(300)
+    group["HealthCheckType"].should.equal("EC2")
+    list(group["LoadBalancerNames"]).should.equal([])
+    group.get("PlacementGroup").should.equal(None)
+    list(group["TerminationPolicies"]).should.equal([])
+    list(group["Tags"]).should.equal([])
 
 
 @mock_autoscaling
@@ -126,271 +123,270 @@ def test_list_many_autoscaling_groups():
     tags.should.contain({"Value": "TestGroup1", "Key": "aws:autoscaling:groupName"})
 
 
-@mock_autoscaling_deprecated
+@mock_autoscaling
 def test_autoscaling_group_describe_filter():
-    mocked_networking = setup_networking_deprecated()
-    conn = boto.connect_autoscale()
-    config = LaunchConfiguration(
-        name="tester", image_id="ami-abcd1234", instance_type="t2.medium"
+    mocked_networking = setup_networking()
+    conn = boto3.client("autoscaling", region_name="us-east-1")
+    config = dict(
+        LaunchConfigurationName="tester", ImageId="ami-abcd1234", InstanceType="t2.medium"
     )
-    conn.create_launch_configuration(config)
+    conn.create_launch_configuration(**config)
 
-    group = AutoScalingGroup(
-        name="tester_group",
-        max_size=2,
-        min_size=2,
-        launch_config=config,
-        vpc_zone_identifier=mocked_networking["subnet1"],
+    group = dict(
+        AutoScalingGroupName="tester_group",
+        MaxSize=2,
+        MinSize=2,
+        LaunchConfigurationName="tester",
+        VPCZoneIdentifier=mocked_networking["subnet1"],
     )
-    conn.create_auto_scaling_group(group)
-    group.name = "tester_group2"
-    conn.create_auto_scaling_group(group)
-    group.name = "tester_group3"
-    conn.create_auto_scaling_group(group)
+    conn.create_auto_scaling_group(**group)
+    group["AutoScalingGroupName"] = "tester_group2"
+    conn.create_auto_scaling_group(**group)
+    group["AutoScalingGroupName"] = "tester_group3"
+    conn.create_auto_scaling_group(**group)
 
-    conn.get_all_groups(names=["tester_group", "tester_group2"]).should.have.length_of(
+    conn.describe_auto_scaling_groups(
+        AutoScalingGroupNames=["tester_group", "tester_group2"]
+    )["AutoScalingGroups"].should.have.length_of(
         2
     )
-    conn.get_all_groups().should.have.length_of(3)
+    conn.describe_auto_scaling_groups()["AutoScalingGroups"].should.have.length_of(3)
 
 
-@mock_autoscaling_deprecated
+@mock_autoscaling
 def test_autoscaling_update():
-    mocked_networking = setup_networking_deprecated()
-    conn = boto.connect_autoscale()
-    config = LaunchConfiguration(
-        name="tester", image_id="ami-abcd1234", instance_type="t2.medium"
+    mocked_networking = setup_networking()
+    conn = boto3.client("autoscaling", region_name="us-east-1")
+    config = dict(
+        LaunchConfigurationName="tester", ImageId="ami-abcd1234", InstanceType="t2.medium"
     )
-    conn.create_launch_configuration(config)
+    conn.create_launch_configuration(**config)
 
-    group = AutoScalingGroup(
-        name="tester_group",
-        desired_capacity=2,
-        max_size=2,
-        min_size=2,
-        launch_config=config,
-        vpc_zone_identifier=mocked_networking["subnet1"],
+    group = dict(
+        AutoScalingGroupName="tester_group",
+        DesiredCapacity=2,
+        MaxSize=2,
+        MinSize=2,
+        LaunchConfigurationName="tester",
+        VPCZoneIdentifier=mocked_networking["subnet1"],
     )
-    conn.create_auto_scaling_group(group)
+    conn.create_auto_scaling_group(**group)
 
-    group = conn.get_all_groups()[0]
-    group.availability_zones.should.equal(["us-east-1a"])
-    group.vpc_zone_identifier.should.equal(mocked_networking["subnet1"])
+    group = conn.describe_auto_scaling_groups()["AutoScalingGroups"][0]
+    group["AvailabilityZones"].should.equal(["us-east-1a"])
+    group["VPCZoneIdentifier"].should.equal(mocked_networking["subnet1"])
 
-    group.availability_zones = ["us-east-1b"]
-    group.vpc_zone_identifier = mocked_networking["subnet2"]
-    group.update()
+    conn.update_auto_scaling_group(
+        AutoScalingGroupName="tester_group",
+        AvailabilityZones=["us-east-1b"],
+        VPCZoneIdentifier=mocked_networking["subnet2"],
+    )
 
-    group = conn.get_all_groups()[0]
-    group.availability_zones.should.equal(["us-east-1b"])
-    group.vpc_zone_identifier.should.equal(mocked_networking["subnet2"])
+    group = conn.describe_auto_scaling_groups()["AutoScalingGroups"][0]
+    group["AvailabilityZones"].should.equal(["us-east-1b"])
+    group["VPCZoneIdentifier"].should.equal(mocked_networking["subnet2"])
 
 
-@mock_autoscaling_deprecated
+@mock_autoscaling
 def test_autoscaling_tags_update():
-    mocked_networking = setup_networking_deprecated()
-    conn = boto.connect_autoscale()
-    config = LaunchConfiguration(
-        name="tester", image_id="ami-abcd1234", instance_type="t2.medium"
+    mocked_networking = setup_networking()
+    conn = boto3.client("autoscaling", region_name="us-east-1")
+    config = dict(
+        LaunchConfigurationName="tester", ImageId="ami-abcd1234", InstanceType="t2.medium"
     )
-    conn.create_launch_configuration(config)
+    conn.create_launch_configuration(**config)
 
-    group = AutoScalingGroup(
-        name="tester_group",
-        availability_zones=["us-east-1a"],
-        desired_capacity=2,
-        max_size=2,
-        min_size=2,
-        launch_config=config,
-        tags=[
-            Tag(
-                resource_id="tester_group",
-                key="test_key",
-                value="test_value",
-                propagate_at_launch=True,
-            )
-        ],
-        vpc_zone_identifier=mocked_networking["subnet1"],
+    group = dict(
+        AutoScalingGroupName="tester_group",
+        AvailabilityZones=["us-east-1a"],
+        DesiredCapacity=2,
+        MaxSize=2,
+        MinSize=2,
+        LaunchConfigurationName="tester",
+        Tags=[dict(
+            ResourceId="tester_group",
+            Key="test_key",
+            Value="test_value",
+            PropagateAtLaunch=True,
+        )],
+        VPCZoneIdentifier=mocked_networking["subnet1"],
     )
-    conn.create_auto_scaling_group(group)
+    conn.create_auto_scaling_group(**group)
 
     conn.create_or_update_tags(
-        tags=[
-            Tag(
-                resource_id="tester_group",
-                key="test_key",
-                value="new_test_value",
-                propagate_at_launch=True,
+        Tags=[
+            dict(
+                ResourceId="tester_group",
+                Key="test_key",
+                Value="new_test_value",
+                PropagateAtLaunch=True,
             ),
-            Tag(
-                resource_id="tester_group",
-                key="test_key2",
-                value="test_value2",
-                propagate_at_launch=True,
+            dict(
+                ResourceId="tester_group",
+                Key="test_key2",
+                Value="test_value2",
+                PropagateAtLaunch=True,
             ),
         ]
     )
-    group = conn.get_all_groups()[0]
-    group.tags.should.have.length_of(2)
+    group = conn.describe_auto_scaling_groups()["AutoScalingGroups"][0]
+    group["Tags"].should.have.length_of(2)
 
 
-@mock_autoscaling_deprecated
+@mock_autoscaling
 def test_autoscaling_group_delete():
-    mocked_networking = setup_networking_deprecated()
-    conn = boto.connect_autoscale()
-    config = LaunchConfiguration(
-        name="tester", image_id="ami-abcd1234", instance_type="t2.medium"
+    mocked_networking = setup_networking()
+    conn = boto3.client("autoscaling", region_name="us-east-1")
+    config = dict(
+        LaunchConfigurationName="tester", ImageId="ami-abcd1234", InstanceType="t2.medium"
     )
-    conn.create_launch_configuration(config)
+    conn.create_launch_configuration(**config)
 
-    group = AutoScalingGroup(
-        name="tester_group",
-        max_size=2,
-        min_size=2,
-        launch_config=config,
-        vpc_zone_identifier=mocked_networking["subnet1"],
+    group = dict(
+        AutoScalingGroupName="tester_group",
+        MaxSize=2,
+        MinSize=2,
+        LaunchConfigurationName="tester",
+        VPCZoneIdentifier=mocked_networking["subnet1"],
     )
-    conn.create_auto_scaling_group(group)
+    conn.create_auto_scaling_group(**group)
 
-    conn.get_all_groups().should.have.length_of(1)
+    conn.describe_auto_scaling_groups()["AutoScalingGroups"].should.have.length_of(1)
 
-    conn.delete_auto_scaling_group("tester_group")
-    conn.get_all_groups().should.have.length_of(0)
+    conn.delete_auto_scaling_group(AutoScalingGroupName="tester_group")
+    conn.describe_auto_scaling_groups()["AutoScalingGroups"].should.have.length_of(0)
 
 
-@mock_ec2_deprecated
-@mock_autoscaling_deprecated
+@mock_ec2
+@mock_autoscaling
 def test_autoscaling_group_describe_instances():
-    mocked_networking = setup_networking_deprecated()
-    conn = boto.ec2.autoscale.connect_to_region("us-east-1")
-    config = LaunchConfiguration(
-        name="tester", image_id="ami-abcd1234", instance_type="t2.medium"
+    mocked_networking = setup_networking()
+    conn = boto3.client("autoscaling", region_name="us-east-1")
+    config = dict(
+        LaunchConfigurationName="tester", ImageId="ami-abcd1234", InstanceType="t2.medium"
     )
-    conn.create_launch_configuration(config)
+    conn.create_launch_configuration(**config)
 
-    group = AutoScalingGroup(
-        name="tester_group",
-        max_size=2,
-        min_size=2,
-        launch_config=config,
-        vpc_zone_identifier=mocked_networking["subnet1"],
+    group = dict(
+        AutoScalingGroupName="tester_group",
+        MaxSize=2,
+        MinSize=2,
+        LaunchConfigurationName="tester",
+        VPCZoneIdentifier=mocked_networking["subnet1"],
     )
-    conn.create_auto_scaling_group(group)
+    conn.create_auto_scaling_group(**group)
 
-    instances = list(conn.get_all_autoscaling_instances())
+    instances = list(conn.describe_auto_scaling_instances()["AutoScalingInstances"])
     instances.should.have.length_of(2)
-    instances[0].launch_config_name.should.equal("tester")
-    instances[0].health_status.should.equal("Healthy")
-    autoscale_instance_ids = [instance.instance_id for instance in instances]
+    instances[0]["LaunchConfigurationName"].should.equal("tester")
+    instances[0]["HealthStatus"].should.equal("Healthy")
+    autoscale_instance_ids = [instance["InstanceId"] for instance in instances]
 
-    ec2_conn = boto.ec2.connect_to_region("us-east-1")
-    reservations = ec2_conn.get_all_instances()
-    instances = reservations[0].instances
+    ec2_conn = boto3.client("ec2", region_name="us-east-1")
+    reservations = ec2_conn.describe_instances()["Reservations"]
+    instances = reservations[0]["Instances"]
     instances.should.have.length_of(2)
-    instance_ids = [instance.id for instance in instances]
+    instance_ids = [instance["InstanceId"] for instance in instances]
     set(autoscale_instance_ids).should.equal(set(instance_ids))
-    instances[0].instance_type.should.equal("t2.medium")
+    instances[0]["InstanceType"].should.equal("t2.medium")
 
 
-@requires_boto_gte("2.8")
-@mock_autoscaling_deprecated
+@mock_autoscaling
 def test_set_desired_capacity_up():
-    mocked_networking = setup_networking_deprecated()
-    conn = boto.connect_autoscale()
-    config = LaunchConfiguration(
-        name="tester", image_id="ami-abcd1234", instance_type="t2.medium"
+    mocked_networking = setup_networking()
+    conn = boto3.client("autoscaling", region_name="us-east-1")
+    config = dict(
+        LaunchConfigurationName="tester", ImageId="ami-abcd1234", InstanceType="t2.medium"
     )
-    conn.create_launch_configuration(config)
+    conn.create_launch_configuration(**config)
 
-    group = AutoScalingGroup(
-        name="tester_group",
-        availability_zones=["us-east-1a"],
-        desired_capacity=2,
-        max_size=2,
-        min_size=2,
-        launch_config=config,
-        vpc_zone_identifier=mocked_networking["subnet1"],
+    group = dict(
+        AutoScalingGroupName="tester_group",
+        AvailabilityZones=["us-east-1a"],
+        DesiredCapacity=2,
+        MaxSize=2,
+        MinSize=2,
+        LaunchConfigurationName="tester",
+        VPCZoneIdentifier=mocked_networking["subnet1"],
     )
-    conn.create_auto_scaling_group(group)
+    conn.create_auto_scaling_group(**group)
 
-    group = conn.get_all_groups()[0]
-    group.desired_capacity.should.equal(2)
-    instances = list(conn.get_all_autoscaling_instances())
+    group = conn.describe_auto_scaling_groups()["AutoScalingGroups"][0]
+    group["DesiredCapacity"].should.equal(2)
+    instances = list(conn.describe_auto_scaling_instances()["AutoScalingInstances"])
     instances.should.have.length_of(2)
 
-    conn.set_desired_capacity("tester_group", 3)
-    group = conn.get_all_groups()[0]
-    group.desired_capacity.should.equal(3)
+    conn.set_desired_capacity(AutoScalingGroupName="tester_group", DesiredCapacity=3)
+    group = conn.describe_auto_scaling_groups()["AutoScalingGroups"][0]
+    group["DesiredCapacity"].should.equal(3)
 
-    instances = list(conn.get_all_autoscaling_instances())
+    instances = list(conn.describe_auto_scaling_instances()["AutoScalingInstances"])
     instances.should.have.length_of(3)
 
 
-@requires_boto_gte("2.8")
-@mock_autoscaling_deprecated
+@mock_autoscaling
 def test_set_desired_capacity_down():
-    mocked_networking = setup_networking_deprecated()
-    conn = boto.connect_autoscale()
-    config = LaunchConfiguration(
-        name="tester", image_id="ami-abcd1234", instance_type="t2.medium"
+    mocked_networking = setup_networking()
+    conn = boto3.client("autoscaling", region_name="us-east-1")
+    config = dict(
+        LaunchConfigurationName="tester", ImageId="ami-abcd1234", InstanceType="t2.medium"
     )
-    conn.create_launch_configuration(config)
+    conn.create_launch_configuration(**config)
 
-    group = AutoScalingGroup(
-        name="tester_group",
-        availability_zones=["us-east-1a"],
-        desired_capacity=2,
-        max_size=2,
-        min_size=2,
-        launch_config=config,
-        vpc_zone_identifier=mocked_networking["subnet1"],
+    group = dict(
+        AutoScalingGroupName="tester_group",
+        AvailabilityZones=["us-east-1a"],
+        DesiredCapacity=2,
+        MaxSize=2,
+        MinSize=2,
+        LaunchConfigurationName="tester",
+        VPCZoneIdentifier=mocked_networking["subnet1"],
     )
-    conn.create_auto_scaling_group(group)
+    conn.create_auto_scaling_group(**group)
 
-    group = conn.get_all_groups()[0]
-    group.desired_capacity.should.equal(2)
-    instances = list(conn.get_all_autoscaling_instances())
+    group = conn.describe_auto_scaling_groups()["AutoScalingGroups"][0]
+    group["DesiredCapacity"].should.equal(2)
+    instances = list(conn.describe_auto_scaling_instances()["AutoScalingInstances"])
     instances.should.have.length_of(2)
 
-    conn.set_desired_capacity("tester_group", 1)
-    group = conn.get_all_groups()[0]
-    group.desired_capacity.should.equal(1)
+    conn.set_desired_capacity(AutoScalingGroupName="tester_group", DesiredCapacity=1)
+    group = conn.describe_auto_scaling_groups()["AutoScalingGroups"][0]
+    group["DesiredCapacity"].should.equal(1)
 
-    instances = list(conn.get_all_autoscaling_instances())
+    instances = list(conn.describe_auto_scaling_instances()["AutoScalingInstances"])
     instances.should.have.length_of(1)
 
 
-@requires_boto_gte("2.8")
-@mock_autoscaling_deprecated
+@mock_autoscaling
 def test_set_desired_capacity_the_same():
-    mocked_networking = setup_networking_deprecated()
-    conn = boto.connect_autoscale()
-    config = LaunchConfiguration(
-        name="tester", image_id="ami-abcd1234", instance_type="t2.medium"
+    mocked_networking = setup_networking()
+    conn = boto3.client("autoscaling", region_name="us-east-1")
+    config = dict(
+        LaunchConfigurationName="tester", ImageId="ami-abcd1234", InstanceType="t2.medium"
     )
-    conn.create_launch_configuration(config)
+    conn.create_launch_configuration(**config)
 
-    group = AutoScalingGroup(
-        name="tester_group",
-        availability_zones=["us-east-1a"],
-        desired_capacity=2,
-        max_size=2,
-        min_size=2,
-        launch_config=config,
-        vpc_zone_identifier=mocked_networking["subnet1"],
+    group = dict(
+        AutoScalingGroupName="tester_group",
+        AvailabilityZones=["us-east-1a"],
+        DesiredCapacity=2,
+        MaxSize=2,
+        MinSize=2,
+        LaunchConfigurationName="tester",
+        VPCZoneIdentifier=mocked_networking["subnet1"],
     )
-    conn.create_auto_scaling_group(group)
+    conn.create_auto_scaling_group(**group)
 
-    group = conn.get_all_groups()[0]
-    group.desired_capacity.should.equal(2)
-    instances = list(conn.get_all_autoscaling_instances())
+    group = conn.describe_auto_scaling_groups()["AutoScalingGroups"][0]
+    group["DesiredCapacity"].should.equal(2)
+    instances = list(conn.describe_auto_scaling_instances()["AutoScalingInstances"])
     instances.should.have.length_of(2)
 
-    conn.set_desired_capacity("tester_group", 2)
-    group = conn.get_all_groups()[0]
-    group.desired_capacity.should.equal(2)
+    conn.set_desired_capacity(AutoScalingGroupName="tester_group", DesiredCapacity=2)
+    group = conn.describe_auto_scaling_groups()["AutoScalingGroups"][0]
+    group["DesiredCapacity"].should.equal(2)
 
-    instances = list(conn.get_all_autoscaling_instances())
+    instances = list(conn.describe_auto_scaling_instances()["AutoScalingInstances"])
     instances.should.have.length_of(2)
 
 
@@ -800,7 +796,7 @@ def test_update_autoscaling_group_boto3():
 
 
 @mock_autoscaling
-def test_update_autoscaling_group_min_size_desired_capacity_change():
+def test_update_autoscaling_group_MinSize_desired_capacity_change():
     mocked_networking = setup_networking()
     client = boto3.client("autoscaling", region_name="us-east-1")
 
@@ -824,7 +820,7 @@ def test_update_autoscaling_group_min_size_desired_capacity_change():
 
 
 @mock_autoscaling
-def test_update_autoscaling_group_max_size_desired_capacity_change():
+def test_update_autoscaling_group_MaxSize_desired_capacity_change():
     mocked_networking = setup_networking()
     client = boto3.client("autoscaling", region_name="us-east-1")
 
