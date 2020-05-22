@@ -10,7 +10,9 @@ def setup_autoscale_group():
     mocked_networking = setup_networking()
     conn = boto3.client("autoscaling", region_name="us-east-1")
     config = dict(
-        LaunchConfigurationName="tester", ImageId="ami-abcd1234", InstanceType="m1.small"
+        LaunchConfigurationName="tester",
+        ImageId="ami-abcd1234",
+        InstanceType="m1.small",
     )
     conn.create_launch_configuration(**config)
 
@@ -39,11 +41,11 @@ def test_create_policy():
     conn.put_scaling_policy(**policy)
 
     policy = conn.describe_policies()["ScalingPolicies"][0]
-    policy['PolicyName'].should.equal("ScaleUp")
-    policy['AdjustmentType'].should.equal("ExactCapacity")
-    policy['AutoScalingGroupName'].should.equal("tester_group")
-    policy['ScalingAdjustment'].should.equal(3)
-    policy['Cooldown'].should.equal(60)
+    policy["PolicyName"].should.equal("ScaleUp")
+    policy["AdjustmentType"].should.equal("ExactCapacity")
+    policy["AutoScalingGroupName"].should.equal("tester_group")
+    policy["ScalingAdjustment"].should.equal(3)
+    policy["Cooldown"].should.equal(60)
 
 
 @mock_autoscaling

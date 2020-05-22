@@ -31,7 +31,9 @@ def test_create_autoscaling_groups_defaults():
     mocked_networking = setup_networking()
     conn = boto3.client("autoscaling", region_name="us-east-1")
     config = dict(
-        LaunchConfigurationName="tester", ImageId="ami-abcd1234", InstanceType="t2.medium"
+        LaunchConfigurationName="tester",
+        ImageId="ami-abcd1234",
+        InstanceType="t2.medium",
     )
     conn.create_launch_configuration(**config)
 
@@ -128,7 +130,9 @@ def test_autoscaling_group_describe_filter():
     mocked_networking = setup_networking()
     conn = boto3.client("autoscaling", region_name="us-east-1")
     config = dict(
-        LaunchConfigurationName="tester", ImageId="ami-abcd1234", InstanceType="t2.medium"
+        LaunchConfigurationName="tester",
+        ImageId="ami-abcd1234",
+        InstanceType="t2.medium",
     )
     conn.create_launch_configuration(**config)
 
@@ -147,9 +151,7 @@ def test_autoscaling_group_describe_filter():
 
     conn.describe_auto_scaling_groups(
         AutoScalingGroupNames=["tester_group", "tester_group2"]
-    )["AutoScalingGroups"].should.have.length_of(
-        2
-    )
+    )["AutoScalingGroups"].should.have.length_of(2)
     conn.describe_auto_scaling_groups()["AutoScalingGroups"].should.have.length_of(3)
 
 
@@ -158,7 +160,9 @@ def test_autoscaling_update():
     mocked_networking = setup_networking()
     conn = boto3.client("autoscaling", region_name="us-east-1")
     config = dict(
-        LaunchConfigurationName="tester", ImageId="ami-abcd1234", InstanceType="t2.medium"
+        LaunchConfigurationName="tester",
+        ImageId="ami-abcd1234",
+        InstanceType="t2.medium",
     )
     conn.create_launch_configuration(**config)
 
@@ -192,7 +196,9 @@ def test_autoscaling_tags_update():
     mocked_networking = setup_networking()
     conn = boto3.client("autoscaling", region_name="us-east-1")
     config = dict(
-        LaunchConfigurationName="tester", ImageId="ami-abcd1234", InstanceType="t2.medium"
+        LaunchConfigurationName="tester",
+        ImageId="ami-abcd1234",
+        InstanceType="t2.medium",
     )
     conn.create_launch_configuration(**config)
 
@@ -203,12 +209,14 @@ def test_autoscaling_tags_update():
         MaxSize=2,
         MinSize=2,
         LaunchConfigurationName="tester",
-        Tags=[dict(
-            ResourceId="tester_group",
-            Key="test_key",
-            Value="test_value",
-            PropagateAtLaunch=True,
-        )],
+        Tags=[
+            dict(
+                ResourceId="tester_group",
+                Key="test_key",
+                Value="test_value",
+                PropagateAtLaunch=True,
+            )
+        ],
         VPCZoneIdentifier=mocked_networking["subnet1"],
     )
     conn.create_auto_scaling_group(**group)
@@ -238,7 +246,9 @@ def test_autoscaling_group_delete():
     mocked_networking = setup_networking()
     conn = boto3.client("autoscaling", region_name="us-east-1")
     config = dict(
-        LaunchConfigurationName="tester", ImageId="ami-abcd1234", InstanceType="t2.medium"
+        LaunchConfigurationName="tester",
+        ImageId="ami-abcd1234",
+        InstanceType="t2.medium",
     )
     conn.create_launch_configuration(**config)
 
@@ -263,7 +273,9 @@ def test_autoscaling_group_describe_instances():
     mocked_networking = setup_networking()
     conn = boto3.client("autoscaling", region_name="us-east-1")
     config = dict(
-        LaunchConfigurationName="tester", ImageId="ami-abcd1234", InstanceType="t2.medium"
+        LaunchConfigurationName="tester",
+        ImageId="ami-abcd1234",
+        InstanceType="t2.medium",
     )
     conn.create_launch_configuration(**config)
 
@@ -296,7 +308,9 @@ def test_set_desired_capacity_up():
     mocked_networking = setup_networking()
     conn = boto3.client("autoscaling", region_name="us-east-1")
     config = dict(
-        LaunchConfigurationName="tester", ImageId="ami-abcd1234", InstanceType="t2.medium"
+        LaunchConfigurationName="tester",
+        ImageId="ami-abcd1234",
+        InstanceType="t2.medium",
     )
     conn.create_launch_configuration(**config)
 
@@ -329,7 +343,9 @@ def test_set_desired_capacity_down():
     mocked_networking = setup_networking()
     conn = boto3.client("autoscaling", region_name="us-east-1")
     config = dict(
-        LaunchConfigurationName="tester", ImageId="ami-abcd1234", InstanceType="t2.medium"
+        LaunchConfigurationName="tester",
+        ImageId="ami-abcd1234",
+        InstanceType="t2.medium",
     )
     conn.create_launch_configuration(**config)
 
@@ -362,7 +378,9 @@ def test_set_desired_capacity_the_same():
     mocked_networking = setup_networking()
     conn = boto3.client("autoscaling", region_name="us-east-1")
     config = dict(
-        LaunchConfigurationName="tester", ImageId="ami-abcd1234", InstanceType="t2.medium"
+        LaunchConfigurationName="tester",
+        ImageId="ami-abcd1234",
+        InstanceType="t2.medium",
     )
     conn.create_launch_configuration(**config)
 

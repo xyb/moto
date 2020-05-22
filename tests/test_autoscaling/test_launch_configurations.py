@@ -33,9 +33,9 @@ def test_create_launch_configuration():
     launch_config["InstanceType"].should.equal("t1.micro")
     launch_config["KeyName"].should.equal("the_keys")
     set(launch_config["SecurityGroups"]).should.equal(set(["default", "default2"]))
-    base64.decodestring(
-        launch_config["UserData"].encode("utf8")
-    ).should.equal(b"This is some user_data")
+    base64.decodestring(launch_config["UserData"].encode("utf8")).should.equal(
+        b"This is some user_data"
+    )
     launch_config["InstanceMonitoring"]["Enabled"].should.equal(True)
     launch_config["IamInstanceProfile"].should.equal(
         "arn:aws:iam::{}:instance-profile/testing".format(ACCOUNT_ID)
@@ -46,24 +46,22 @@ def test_create_launch_configuration():
 @mock_autoscaling
 def test_create_launch_configuration_with_block_device_mappings():
 
-    block_device_mappings = [{
-        'VirtualName': 'ephemeral0',
-        'DeviceName': "/dev/xvdb",
-    }, {
-        'DeviceName': "/dev/xvdp",
-        'Ebs': {
-            'SnapshotId': 'snap-1234abcd',
-            'VolumeType': 'standard',
+    block_device_mappings = [
+        {"VirtualName": "ephemeral0", "DeviceName": "/dev/xvdb",},
+        {
+            "DeviceName": "/dev/xvdp",
+            "Ebs": {"SnapshotId": "snap-1234abcd", "VolumeType": "standard",},
         },
-    }, {
-        'DeviceName': "/dev/xvdh",
-        'Ebs': {
-            'VolumeSize': 100,
-            'VolumeType': 'io1',
-            'DeleteOnTermination': False,
-            'Iops': 1000,
+        {
+            "DeviceName": "/dev/xvdh",
+            "Ebs": {
+                "VolumeSize": 100,
+                "VolumeType": "io1",
+                "DeleteOnTermination": False,
+                "Iops": 1000,
+            },
         },
-    }]
+    ]
 
     conn = boto3.client("autoscaling", region_name="us-east-1")
     config = dict(
@@ -88,9 +86,9 @@ def test_create_launch_configuration_with_block_device_mappings():
     launch_config["InstanceType"].should.equal("m1.small")
     launch_config["KeyName"].should.equal("the_keys")
     set(launch_config["SecurityGroups"]).should.equal(set(["default", "default2"]))
-    base64.decodestring(
-        launch_config["UserData"].encode("utf8")
-    ).should.equal(b"This is some user_data")
+    base64.decodestring(launch_config["UserData"].encode("utf8")).should.equal(
+        b"This is some user_data"
+    )
     launch_config["InstanceMonitoring"]["Enabled"].should.equal(True)
     launch_config["IamInstanceProfile"].should.equal(
         "arn:aws:iam::{}:instance-profile/testing".format(ACCOUNT_ID)
@@ -100,10 +98,8 @@ def test_create_launch_configuration_with_block_device_mappings():
 
     returned_mapping = launch_config["BlockDeviceMappings"]
 
-    devices = {block["DeviceName"]:block for block in returned_mapping}
-    set(devices.keys()).should.equal(
-        set(["/dev/xvdb", "/dev/xvdp", "/dev/xvdh"])
-    )
+    devices = {block["DeviceName"]: block for block in returned_mapping}
+    set(devices.keys()).should.equal(set(["/dev/xvdb", "/dev/xvdp", "/dev/xvdh"]))
 
     devices["/dev/xvdh"]["Ebs"]["Iops"].should.equal(1000)
     devices["/dev/xvdh"]["Ebs"]["VolumeSize"].should.equal(100)
@@ -132,7 +128,9 @@ def test_create_launch_configuration_for_2_12():
 def test_create_launch_configuration_using_ip_association():
     conn = boto3.client("autoscaling", region_name="us-east-1")
     config = dict(
-        LaunchConfigurationName="tester", ImageId="ami-abcd1234", AssociatePublicIpAddress=True
+        LaunchConfigurationName="tester",
+        ImageId="ami-abcd1234",
+        AssociatePublicIpAddress=True,
     )
     conn.create_launch_configuration(**config)
 
@@ -156,7 +154,9 @@ def test_create_launch_configuration_defaults():
     are assigned for the other attributes """
     conn = boto3.client("autoscaling", region_name="us-east-1")
     config = dict(
-        LaunchConfigurationName="tester", ImageId="ami-abcd1234", InstanceType="m1.small"
+        LaunchConfigurationName="tester",
+        ImageId="ami-abcd1234",
+        InstanceType="m1.small",
     )
     conn.create_launch_configuration(**config)
 
@@ -188,7 +188,9 @@ def test_create_launch_configuration_defaults_for_2_12():
 def test_launch_configuration_describe_filter():
     conn = boto3.client("autoscaling", region_name="us-east-1")
     config = dict(
-        LaunchConfigurationName="tester", ImageId="ami-abcd1234", InstanceType="m1.small"
+        LaunchConfigurationName="tester",
+        ImageId="ami-abcd1234",
+        InstanceType="m1.small",
     )
     conn.create_launch_configuration(**config)
     config["LaunchConfigurationName"] = "tester2"
@@ -196,10 +198,12 @@ def test_launch_configuration_describe_filter():
     config["LaunchConfigurationName"] = "tester3"
     conn.create_launch_configuration(**config)
 
-    conn.describe_launch_configurations(
-        LaunchConfigurationNames=["tester", "tester2"]
-    )["LaunchConfigurations"].should.have.length_of(2)
-    conn.describe_launch_configurations()["LaunchConfigurations"].should.have.length_of(3)
+    conn.describe_launch_configurations(LaunchConfigurationNames=["tester", "tester2"])[
+        "LaunchConfigurations"
+    ].should.have.length_of(2)
+    conn.describe_launch_configurations()["LaunchConfigurations"].should.have.length_of(
+        3
+    )
 
 
 @mock_autoscaling
@@ -225,11 +229,17 @@ def test_launch_configuration_describe_paginated():
 def test_launch_configuration_delete():
     conn = boto3.client("autoscaling", region_name="us-east-1")
     config = dict(
-        LaunchConfigurationName="tester", ImageId="ami-abcd1234", InstanceType="m1.small"
+        LaunchConfigurationName="tester",
+        ImageId="ami-abcd1234",
+        InstanceType="m1.small",
     )
     conn.create_launch_configuration(**config)
 
-    conn.describe_launch_configurations()["LaunchConfigurations"].should.have.length_of(1)
+    conn.describe_launch_configurations()["LaunchConfigurations"].should.have.length_of(
+        1
+    )
 
     conn.delete_launch_configuration(LaunchConfigurationName="tester")
-    conn.describe_launch_configurations()["LaunchConfigurations"].should.have.length_of(0)
+    conn.describe_launch_configurations()["LaunchConfigurations"].should.have.length_of(
+        0
+    )
