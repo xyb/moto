@@ -2,8 +2,12 @@ from __future__ import unicode_literals
 from six.moves.urllib.request import urlopen
 from six.moves.urllib.error import HTTPError
 
+import datetime
+from dateutil.tz import tzutc
+
 import boto
-from boto.exception import S3ResponseError
+import boto3
+from botocore.exceptions import ClientError
 from boto.s3.key import Key
 from boto.s3.connection import OrdinaryCallingFormat
 
@@ -12,11 +16,7 @@ import requests
 
 import sure  # noqa
 
-from moto import mock_s3, mock_s3_deprecated
-
-
-def create_connection(key=None, secret=None):
-    return boto.connect_s3(key, secret, calling_format=OrdinaryCallingFormat())
+from moto import mock_s3
 
 
 class MyModel(object):
@@ -25,227 +25,209 @@ class MyModel(object):
         self.value = value
 
     def save(self):
-        conn = create_connection("the_key", "the_secret")
-        bucket = conn.get_bucket("mybucket")
-        k = Key(bucket)
-        k.key = self.name
-        k.set_contents_from_string(self.value)
+        conn = boto3.client("s3", region_name="us-east-1")
+        conn.put_object(Bucket='mybucket', Key=self.name, Body=self.value)
 
 
-@mock_s3_deprecated
+@mock_s3
 def test_my_model_save():
     # Create Bucket so that test can run
-    conn = create_connection("the_key", "the_secret")
-    conn.create_bucket("mybucket")
+    conn = boto3.client("s3", region_name="us-east-1")
+    conn.create_bucket(Bucket="mybucket")
     ####################################
 
     model_instance = MyModel("steve", "is awesome")
     model_instance.save()
 
-    conn.get_bucket("mybucket").get_key("steve").get_contents_as_string().should.equal(
+    conn.get_object(Bucket="mybucket", Key="steve")["Body"].read().should.equal(
         b"is awesome"
     )
 
 
-@mock_s3_deprecated
+@mock_s3
 def test_missing_key():
-    conn = create_connection("the_key", "the_secret")
-    bucket = conn.create_bucket("foobar")
-    bucket.get_key("the-key").should.equal(None)
+    conn = boto3.client("s3", region_name="us-east-1")
+    bucket = conn.create_bucket(Bucket="foobar")
+    conn.get_object.when.called_with(Bucket="foobar", Key="the-key").should.throw(ClientError)
 
 
-@mock_s3_deprecated
+@mock_s3
 def test_missing_key_urllib2():
-    conn = create_connection("the_key", "the_secret")
-    conn.create_bucket("foobar")
+    conn = boto3.client("s3", region_name="us-east-1")
+    conn.create_bucket(Bucket="foobar")
 
     urlopen.when.called_with("http://s3.amazonaws.com/foobar/the-key").should.throw(
         HTTPError
     )
 
 
-@mock_s3_deprecated
+@mock_s3
 def test_empty_key():
-    conn = create_connection("the_key", "the_secret")
-    bucket = conn.create_bucket("foobar")
-    key = Key(bucket)
-    key.key = "the-key"
-    key.set_contents_from_string("")
+    conn = boto3.client("s3", region_name="us-east-1")
+    bucket = conn.create_bucket(Bucket="foobar")
+    conn.put_object(Bucket="foobar", Key="the-key", Body="")
 
-    bucket.get_key("the-key").get_contents_as_string().should.equal(b"")
+    conn.get_object(Bucket="foobar", Key="the-key")["Body"].read().should.equal(b"")
 
 
-@mock_s3_deprecated
+@mock_s3
 def test_empty_key_set_on_existing_key():
-    conn = create_connection("the_key", "the_secret")
-    bucket = conn.create_bucket("foobar")
-    key = Key(bucket)
-    key.key = "the-key"
-    key.set_contents_from_string("foobar")
+    conn = boto3.client("s3", region_name="us-east-1")
+    bucket = conn.create_bucket(Bucket="foobar")
+    conn.put_object(Bucket="foobar", Key="the-key", Body="foobar")
 
-    bucket.get_key("the-key").get_contents_as_string().should.equal(b"foobar")
+    conn.get_object(Bucket="foobar", Key="the-key")["Body"].read().should.equal(b"foobar")
 
-    key.set_contents_from_string("")
-    bucket.get_key("the-key").get_contents_as_string().should.equal(b"")
+    conn.put_object(Bucket="foobar", Key="the-key", Body="")
+    conn.get_object(Bucket="foobar", Key="the-key")["Body"].read().should.equal(b"")
 
 
-@mock_s3_deprecated
+@mock_s3
 def test_large_key_save():
-    conn = create_connection("the_key", "the_secret")
-    bucket = conn.create_bucket("foobar")
-    key = Key(bucket)
-    key.key = "the-key"
-    key.set_contents_from_string("foobar" * 100000)
+    conn = boto3.client("s3", region_name="us-east-1")
+    bucket = conn.create_bucket(Bucket="foobar")
+    conn.put_object(Bucket="foobar", Key="the-key", Body="foobar" * 100000)
 
-    bucket.get_key("the-key").get_contents_as_string().should.equal(b"foobar" * 100000)
+    conn.get_object(Bucket="foobar", Key="the-key")["Body"].read().should.equal(b"foobar" * 100000)
 
 
-@mock_s3_deprecated
+@mock_s3
 def test_copy_key():
-    conn = create_connection("the_key", "the_secret")
-    bucket = conn.create_bucket("foobar")
-    key = Key(bucket)
-    key.key = "the-key"
-    key.set_contents_from_string("some value")
+    conn = boto3.client("s3", region_name="us-east-1")
+    bucket = conn.create_bucket(Bucket="foobar")
+    conn.put_object(Bucket="foobar", Key="the-key", Body="some value")
 
-    bucket.copy_key("new-key", "foobar", "the-key")
+    conn.copy_object(Bucket="foobar", Key="new-key", CopySource={'Bucket': 'foobar', 'Key': "the-key"})
 
-    bucket.get_key("the-key").get_contents_as_string().should.equal(b"some value")
-    bucket.get_key("new-key").get_contents_as_string().should.equal(b"some value")
+    conn.get_object(Bucket="foobar", Key="the-key")["Body"].read().should.equal(b"some value")
+    conn.get_object(Bucket="foobar", Key="new-key")["Body"].read().should.equal(b"some value")
 
 
-@mock_s3_deprecated
+@mock_s3
 def test_set_metadata():
-    conn = create_connection("the_key", "the_secret")
-    bucket = conn.create_bucket("foobar")
-    key = Key(bucket)
-    key.key = "the-key"
-    key.set_metadata("md", "Metadatastring")
-    key.set_contents_from_string("Testval")
+    conn = boto3.client("s3", region_name="us-east-1")
+    bucket = conn.create_bucket(Bucket="foobar")
 
-    bucket.get_key("the-key").get_metadata("md").should.equal("Metadatastring")
+    conn.put_object(Bucket="foobar", Key="the-key", Body="Testval", Metadata={"md": "Metadatastring"})
+
+    conn.get_object(Bucket="foobar", Key="the-key")["Metadata"]["md"].should.equal("Metadatastring")
 
 
 @freeze_time("2012-01-01 12:00:00")
-@mock_s3_deprecated
+@mock_s3
 def test_last_modified():
     # See https://github.com/boto/boto/issues/466
-    conn = create_connection()
-    bucket = conn.create_bucket("foobar")
-    key = Key(bucket)
-    key.key = "the-key"
-    key.set_contents_from_string("some value")
+    conn = boto3.client("s3", region_name="us-east-1")
+    bucket = conn.create_bucket(Bucket="foobar")
+    conn.put_object(Bucket="foobar", Key="the-key", Body="some value")
 
-    rs = bucket.get_all_keys()
-    rs[0].last_modified.should.equal("2012-01-01T12:00:00.000Z")
+    rs = conn.list_objects(Bucket="foobar")["Contents"]
+    rs[0]["LastModified"].should.equal(datetime.datetime(2012, 1, 1, 12, tzinfo=tzutc()))
 
-    bucket.get_key("the-key").last_modified.should.equal(
-        "Sun, 01 Jan 2012 12:00:00 GMT"
+    conn.get_object(Bucket="foobar", Key="the-key")["LastModified"].should.equal(
+        datetime.datetime(2012, 1, 1, 12, tzinfo=tzutc())
     )
 
 
-@mock_s3_deprecated
+@mock_s3
 def test_missing_bucket():
-    conn = create_connection("the_key", "the_secret")
-    conn.get_bucket.when.called_with("mybucket").should.throw(S3ResponseError)
+    conn = boto3.client("s3", region_name="us-east-1")
+    conn.head_bucket.when.called_with(Bucket="mybucket").should.throw(ClientError)
 
 
-@mock_s3_deprecated
+@mock_s3
 def test_bucket_with_dash():
-    conn = create_connection("the_key", "the_secret")
-    conn.get_bucket.when.called_with("mybucket-test").should.throw(S3ResponseError)
+    conn = boto3.client("s3", region_name="us-east-1")
+    conn.head_bucket.when.called_with(Bucket="mybucket-test").should.throw(ClientError)
 
 
-@mock_s3_deprecated
+@mock_s3
 def test_bucket_deletion():
-    conn = create_connection("the_key", "the_secret")
-    bucket = conn.create_bucket("foobar")
+    conn = boto3.client("s3", region_name="us-east-1")
+    bucket = conn.create_bucket(Bucket="foobar")
 
-    key = Key(bucket)
-    key.key = "the-key"
-    key.set_contents_from_string("some value")
+    conn.put_object(Bucket="foobar", Key="the-key", Body="some value")
 
     # Try to delete a bucket that still has keys
-    conn.delete_bucket.when.called_with("foobar").should.throw(S3ResponseError)
+    conn.delete_bucket.when.called_with(Bucket="foobar").should.throw(ClientError)
 
-    bucket.delete_key("the-key")
-    conn.delete_bucket("foobar")
+    conn.delete_object(Bucket="foobar", Key="the-key")
+    conn.delete_bucket(Bucket="foobar")
 
     # Get non-existing bucket
-    conn.get_bucket.when.called_with("foobar").should.throw(S3ResponseError)
+    conn.head_bucket.when.called_with(Bucket="foobar").should.throw(ClientError)
 
     # Delete non-existent bucket
-    conn.delete_bucket.when.called_with("foobar").should.throw(S3ResponseError)
+    conn.delete_bucket.when.called_with(Bucket="foobar").should.throw(ClientError)
 
 
-@mock_s3_deprecated
+@mock_s3
 def test_get_all_buckets():
-    conn = create_connection("the_key", "the_secret")
-    conn.create_bucket("foobar")
-    conn.create_bucket("foobar2")
-    buckets = conn.get_all_buckets()
+    conn = boto3.client("s3", region_name="us-east-1")
+    conn.create_bucket(Bucket="foobar")
+    conn.create_bucket(Bucket="foobar2")
+    buckets = conn.list_buckets()["Buckets"]
 
     buckets.should.have.length_of(2)
 
 
 @mock_s3
-@mock_s3_deprecated
 def test_post_to_bucket():
-    conn = create_connection("the_key", "the_secret")
-    bucket = conn.create_bucket("foobar")
+    conn = boto3.client("s3", region_name="us-east-1")
+    bucket = conn.create_bucket(Bucket="foobar")
 
     requests.post(
         "https://s3.amazonaws.com/foobar", {"key": "the-key", "file": "nothing"}
     )
 
-    bucket.get_key("the-key").get_contents_as_string().should.equal(b"nothing")
+    conn.get_object(Bucket="foobar", Key="the-key")["Body"].read().should.equal(b"nothing")
 
 
 @mock_s3
-@mock_s3_deprecated
 def test_post_with_metadata_to_bucket():
-    conn = create_connection("the_key", "the_secret")
-    bucket = conn.create_bucket("foobar")
+    conn = boto3.client("s3", region_name="us-east-1")
+    bucket = conn.create_bucket(Bucket="foobar")
 
     requests.post(
         "https://s3.amazonaws.com/foobar",
         {"key": "the-key", "file": "nothing", "x-amz-meta-test": "metadata"},
     )
 
-    bucket.get_key("the-key").get_metadata("test").should.equal("metadata")
+    conn.get_object(Bucket="foobar", Key="the-key")["Metadata"]["test"].should.equal("metadata")
 
 
-@mock_s3_deprecated
+@mock_s3
 def test_bucket_name_with_dot():
-    conn = create_connection()
-    bucket = conn.create_bucket("firstname.lastname")
+    conn = boto3.client("s3", region_name="us-east-1")
+    bucket = conn.create_bucket(Bucket="firstname.lastname")
 
-    k = Key(bucket, "somekey")
-    k.set_contents_from_string("somedata")
+    conn.put_object(Bucket="firstname.lastname", Key="somekey", Body="somedata")
 
 
-@mock_s3_deprecated
+@mock_s3
 def test_key_with_special_characters():
-    conn = create_connection()
-    bucket = conn.create_bucket("test_bucket_name")
+    conn = boto3.client("s3", region_name="us-east-1")
+    bucket = conn.create_bucket(Bucket="test_bucket_name")
 
-    key = Key(bucket, "test_list_keys_2/*x+?^@~!y")
-    key.set_contents_from_string("value1")
+    conn.put_object(Bucket="test_bucket_name", Key="test_list_keys_2/*x+?^@~!y", Body="value1")
 
-    key_list = bucket.list("test_list_keys_2/", "/")
+    key_list = conn.list_objects(
+        Bucket="test_bucket_name",
+        Prefix="test_list_keys_2/",
+        Delimiter="/",
+    )["Contents"]
     keys = [x for x in key_list]
-    keys[0].name.should.equal("test_list_keys_2/*x+?^@~!y")
+    keys[0]["Key"].should.equal("test_list_keys_2/*x+?^@~!y")
 
 
-@mock_s3_deprecated
+@mock_s3
 def test_bucket_key_listing_order():
-    conn = create_connection()
-    bucket = conn.create_bucket("test_bucket")
+    conn = boto3.client("s3", region_name="us-east-1")
+    bucket = conn.create_bucket(Bucket="test_bucket")
     prefix = "toplevel/"
 
     def store(name):
-        k = Key(bucket, prefix + name)
-        k.set_contents_from_string("somedata")
+        conn.put_object(Bucket="test_bucket", Key=prefix + name, Body="somedata")
 
     names = ["x/key", "y.key1", "y.key2", "y.key3", "x/y/key", "x/y/z/key"]
 
@@ -253,7 +235,9 @@ def test_bucket_key_listing_order():
         store(name)
 
     delimiter = None
-    keys = [x.name for x in bucket.list(prefix, delimiter)]
+    keys = [x["Key"] for x in
+        conn.list_objects(Bucket="test_bucket", Prefix=prefix)["Contents"]
+    ]
     keys.should.equal(
         [
             "toplevel/x/key",
@@ -265,58 +249,89 @@ def test_bucket_key_listing_order():
         ]
     )
 
+    def get_keys_and_prefixes(prefix, delimiter):
+        args = {}
+        if prefix:
+            args["Prefix"] = prefix
+        if delimiter:
+            args["Delimiter"] = delimiter
+        objects = conn.list_objects(Bucket="test_bucket", **args)
+        prefixes = [prefix["Prefix"] for prefix in objects.get("CommonPrefixes", [])]
+        keys = [x["Key"] for x in
+            objects.get("Contents", [])
+        ]
+        return (keys + prefixes)
+
     delimiter = "/"
-    keys = [x.name for x in bucket.list(prefix, delimiter)]
+    keys = get_keys_and_prefixes(prefix, delimiter)
     keys.should.equal(
         ["toplevel/y.key1", "toplevel/y.key2", "toplevel/y.key3", "toplevel/x/"]
     )
 
     # Test delimiter with no prefix
     delimiter = "/"
-    keys = [x.name for x in bucket.list(prefix=None, delimiter=delimiter)]
+    keys = get_keys_and_prefixes(None, delimiter)
     keys.should.equal(["toplevel/"])
 
     delimiter = None
-    keys = [x.name for x in bucket.list(prefix + "x", delimiter)]
+    keys = get_keys_and_prefixes(prefix + "x", delimiter)
     keys.should.equal(["toplevel/x/key", "toplevel/x/y/key", "toplevel/x/y/z/key"])
 
     delimiter = "/"
-    keys = [x.name for x in bucket.list(prefix + "x", delimiter)]
+    keys = get_keys_and_prefixes(prefix + "x", delimiter)
     keys.should.equal(["toplevel/x/"])
 
 
-@mock_s3_deprecated
+@mock_s3
 def test_delete_keys():
-    conn = create_connection()
-    bucket = conn.create_bucket("foobar")
+    conn = boto3.client("s3", region_name="us-east-1")
+    bucket = conn.create_bucket(Bucket="foobar")
 
-    Key(bucket=bucket, name="file1").set_contents_from_string("abc")
-    Key(bucket=bucket, name="file2").set_contents_from_string("abc")
-    Key(bucket=bucket, name="file3").set_contents_from_string("abc")
-    Key(bucket=bucket, name="file4").set_contents_from_string("abc")
+    conn.put_object(Bucket="foobar", Key="file1", Body="abc")
+    conn.put_object(Bucket="foobar", Key="file2", Body="abc")
+    conn.put_object(Bucket="foobar", Key="file3", Body="abc")
+    conn.put_object(Bucket="foobar", Key="file4", Body="abc")
 
-    result = bucket.delete_keys(["file2", "file3"])
-    result.deleted.should.have.length_of(2)
-    result.errors.should.have.length_of(0)
-    keys = bucket.get_all_keys()
+    result = conn.delete_objects(
+        Bucket="foobar",
+        Delete={
+            "Objects": [{
+                "Key": "file2",
+            }, {
+                "Key": "file3",
+            }]
+        }
+    )
+    result["Deleted"].should.have.length_of(2)
+    result.get("Errors", []).should.have.length_of(0)
+    keys = conn.list_objects(Bucket="foobar")["Contents"]
     keys.should.have.length_of(2)
-    keys[0].name.should.equal("file1")
+    keys[0]["Key"].should.equal("file1")
 
 
-@mock_s3_deprecated
+@mock_s3
 def test_delete_keys_with_invalid():
-    conn = create_connection()
-    bucket = conn.create_bucket("foobar")
+    conn = boto3.client("s3", region_name="us-east-1")
+    bucket = conn.create_bucket(Bucket="foobar")
 
-    Key(bucket=bucket, name="file1").set_contents_from_string("abc")
-    Key(bucket=bucket, name="file2").set_contents_from_string("abc")
-    Key(bucket=bucket, name="file3").set_contents_from_string("abc")
-    Key(bucket=bucket, name="file4").set_contents_from_string("abc")
+    conn.put_object(Bucket="foobar", Key="file1", Body="abc")
+    conn.put_object(Bucket="foobar", Key="file2", Body="abc")
+    conn.put_object(Bucket="foobar", Key="file3", Body="abc")
+    conn.put_object(Bucket="foobar", Key="file4", Body="abc")
 
-    result = bucket.delete_keys(["abc", "file3"])
+    result = conn.delete_objects(
+        Bucket="foobar",
+        Delete={
+            "Objects": [{
+                "Key": "abc",
+            }, {
+                "Key": "file3",
+            }]
+        }
+    )
 
-    result.deleted.should.have.length_of(1)
-    result.errors.should.have.length_of(1)
-    keys = bucket.get_all_keys()
+    result["Deleted"].should.have.length_of(1)
+    result["Errors"].should.have.length_of(1)
+    keys = conn.list_objects(Bucket="foobar")["Contents"]
     keys.should.have.length_of(3)
-    keys[0].name.should.equal("file1")
+    keys[0]["Key"].should.equal("file1")
