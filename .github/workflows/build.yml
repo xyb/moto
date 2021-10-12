@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [ 3.8 ]
+        python-version: [ "3.8" ]
 
     steps:
     - name: Checkout Terraform Tests repo
@@ -43,7 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [ 3.6, 3.7, 3.8, 3.9 ]
+        python-version: [ "3.6", "3.7", "3.8", "3.9", "3.10" ]
 
     steps:
       - uses: actions/checkout@v2
@@ -76,7 +76,7 @@ jobs:
     needs: cache
     strategy:
       matrix:
-        python-version: [3.7]
+        python-version: [ "3.7" ]
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python ${{ matrix.python-version }}
@@ -112,7 +112,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: [3.6, 3.7, 3.8, 3.9]
+        python-version: [ "3.6", "3.7", "3.8", "3.9", "3.10" ]
 
     steps:
     - uses: actions/checkout@v2
@@ -157,7 +157,7 @@ jobs:
     needs: lint
     strategy:
       matrix:
-        python-version: [3.6, 3.7, 3.8, 3.9]
+        python-version: [ "3.6", "3.7", "3.8", "3.9", "3.10" ]
 
     steps:
     - uses: actions/checkout@v2
@@ -221,7 +221,7 @@ jobs:
     needs: lint
     strategy:
       matrix:
-        python-version: [ 3.7, 3.8 ]
+        python-version: [ "3.7", "3.8" ]
 
     steps:
       - uses: actions/checkout@v2
@@ -264,7 +264,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: [ 3.8 ]
+        python-version: [ "3.8" ]
         part: ["aa", "ab", "ac"]
 
     steps:
@@ -328,7 +328,7 @@ jobs:
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' && github.repository == 'spulec/moto' }}
     strategy:
       matrix:
-        python-version: [3.8]
+        python-version: [ "3.8" ]
     steps:
       - uses: actions/checkout@v2
         with:
